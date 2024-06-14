@@ -1,0 +1,17 @@
+{
+  "name": "jira-sync",
+  "version": "1.0.0",
+  "description": "Bidirectional sync data between Google Sheet and JIRA",
+  "main": "Code.js",
+  "scripts": {
+    "init": "clasp clone 1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa",
+    "pull": "clasp pull",
+    "push": "clasp push",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "clasp": "^1.0.0"
+  }
+}

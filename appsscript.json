@@ -1,0 +1,51 @@
+{
+  "timeZone": "Asia/Shanghai",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.container.ui",
+    "https://www.googleapis.com/auth/script.locale",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.storage"
+  ],
+  "urlFetchWhitelist": [
+    "https://*.ringcentral.com/"
+  ],
+  "addOns": {
+    "common": {
+      "name": "JIRA sync test",
+      "logoUrl": "https://lh3.googleusercontent.com/-3LidxlBrmxk/ZgJMNMPA-iI/AAAAAAAAA88/wGRTTurlphEGRJC0sWoox55XDnZiUm4LwCNcBGAsYHQ/s72-c/jira-32.jpg",
+      "layoutProperties": {
+        "primaryColor": "orange",
+        "secondaryColor": "#ffffff"
+      },
+      "useLocaleFromApp": true,
+      "homepageTrigger": {
+        "enabled": true,
+        "runFunction": "onHomepage"
+      },
+      "universalActions": [
+        {
+          "label": "Sync",
+          "runFunction": "createSpreadsheetEditTrigger"
+        },
+        {
+          "label": "Stop sync",
+          "runFunction": "removeSpreadsheetEditTrigger"
+        }
+      ]
+    },
+    "sheets": {
+      "homepageTrigger": {
+        "enabled": true,
+        "runFunction": "onHomepage"
+      }
+    },
+    "docs": {}
+  }
+}
