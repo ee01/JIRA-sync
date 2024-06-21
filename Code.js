@@ -23,7 +23,6 @@ const syncbackSheetURL = env == 'production' ? 'https://docs.google.com/spreadsh
 /* ------------------------- Replace following code to upgrade ------------------------------------------ */
 
 
-const ui = SpreadsheetApp.getUi()
 const jiraFields = ['summary', 'priority', 'description', 'assignee', 'reporter', 'labels', 'components', 'issuetype', 'duedate', 'fixversions', 'status']
 const installProperty = 'install-onEdit_recordChanges'
 const userEmail = Session.getActiveUser().getEmail()
@@ -44,7 +43,7 @@ if (!installInfo) { // To be remove, 兼容旧版
 }
 } catch (err) { console.log('Get Properties failed with error: %s', err.message) }
 let isInstalled = !!installInfo
-let menu = env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test')
+let menu = null
 
 /* Sync and config */
 
@@ -137,6 +136,7 @@ function getFieldsConfig(dataSheet = null, headers = [], startCol = 1) {
 }
 
 function createConfigSheet() {
+  const ui = SpreadsheetApp.getUi()
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   const activeSheet = SpreadsheetApp.getActiveSheet()
   const configSheetName = activeSheet.getName() + '_config'
@@ -187,11 +187,9 @@ function insertJIRAColumn() {
 function onHomepage(e) {
   Logger.log('installInfo:')
   Logger.log(installInfo)
-  // Logger.log('trigger property:')
-  // const Properties = PropertiesService.getDocumentProperties()
-  // Logger.log(Properties.getProperty('trigger-onEdit_recordChanges'))
-  let myInstallTrigger = getMyInstallTrigger()
-  isInstalled = isInstalled || !!myInstallTrigger
+  menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
+  let myInstallTriggers = getMyInstallTriggers()
+  isInstalled = isInstalled || myInstallTriggers.length > 0
   // test环境不会执行 onOpen
   if (env == 'test') if (!isInstalled) menu.addItem('Sync this sheet', 'createSpreadsheetEditTrigger').addToUi()
   else menu.addItem('Stop sync this sheet', 'removeSpreadsheetEditTrigger').addToUi()
@@ -218,12 +216,12 @@ function onHomepage(e) {
   let fixedButton = CardService.newTextButton()
   if (isInstalled) {
     fixedButton.setText("Stop sync this sheet")
-    if (!myInstallTrigger && installInfo) fixedButton.setDisabled(true).setAltText(`The sync for this sheet is managed by ${installInfo.creator}!`)
+    if (!myInstallTriggers.length && installInfo) fixedButton.setDisabled(true).setAltText(`The sync for this sheet is managed by ${installInfo.creator}!`)
     fixedButton.setOnClickAction(CardService.newAction().setFunctionName("removeSpreadsheetEditTrigger"))
   } else fixedButton.setText("Sync this sheet")
             .setOnClickAction(CardService.newAction().setFunctionName("createSpreadsheetEditTrigger"))
   let fixedFooter = CardService.newFixedFooter()
-  if (isInstalled && installInfo && !myInstallTrigger) fixedFooter.setSecondaryButton(CardService.newTextButton().setText("i").setOnClickAction(CardService.newAction().setFunctionName("alertInstalledByOther")))
+  if (isInstalled && installInfo && !myInstallTriggers.length) fixedFooter.setSecondaryButton(CardService.newTextButton().setText("i").setOnClickAction(CardService.newAction().setFunctionName("alertInstalledByOther")))
   // 从toolbar安装后的 edit trigger 别人触发不了。menu安装的可以
   if (!isInstalled) {
     fixedButton.setDisabled(true)
@@ -237,20 +235,24 @@ function onHomepage(e) {
 }
 function alertInstalledByOther() {
   if (!installInfo) return
+  const ui = SpreadsheetApp.getUi()
   ui.alert(`This sheet has been enabled the sync by ${installInfo.creator} at ${installInfo.date}.
     To stop the sync, please reach out to ${installInfo.creator}!`)
 }
 function alertInstallTips() {
+  const ui = SpreadsheetApp.getUi()
   ui.alert(`Please start sync from the menu: 
     Extensions -> JIRA sync -> Sync this sheet!`)
 }
 function comingSoon() {
+  const ui = SpreadsheetApp.getUi()
   ui.alert(`Coming soon!`)
 }
 
 
 // Triggers
 function onInstall(e) {
+  menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   menu.addItem('Click to start!', 'openHomepage').addToUi()
   createSpreadsheetEditTrigger();
 }
@@ -258,6 +260,7 @@ function onOpen(e) {
   Logger.log(userEmail)
   Logger.log('authMode:')
   Logger.log(e.authMode)
+  menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   try {
     Logger.log({'sheet name:': SpreadsheetApp.getActiveSpreadsheet().getName(), 'sheet tab': SpreadsheetApp.getActiveSheet().getName(), 'sheet url:': SpreadsheetApp.getActiveSpreadsheet().getUrl()})
   } catch {}
@@ -273,11 +276,12 @@ function onOpen(e) {
 
   menu.addSeparator()
   menu.addItem('More..', 'openHomepage').addToUi()
-  // ui.createAddonMenu().addItem('test menu', 'openHomepage').addToUi() // To be removed
+  // SpreadsheetApp.getUi().createAddonMenu().addItem('test menu', 'openHomepage').addToUi() // To be removed
 }
 function onFileScopeGrantedSheets(e) {
 }
 function openTheLogSheet() {
+  const ui = SpreadsheetApp.getUi()
   let html = '<a href="' + logSheetURL + '" target="_blank">Click to open!</a>';
   let userInterface = HtmlService.createHtmlOutput(html)
                                .setWidth(300)
@@ -302,13 +306,16 @@ function openHomepage() {
 }
 
 // Trigger class
-function getMyInstallTrigger() {
+function getMyInstallTriggers() {
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   Logger.log('User triggers:')
   Logger.log(ScriptApp.getUserTriggers(activeSpreadsheet).map(v => ({sourece: v.getTriggerSource(), sid: v.getTriggerSourceId(), func:v.getHandlerFunction(), type: v.getEventType(), id: v.getUniqueId()})))
-  return ScriptApp.getUserTriggers(activeSpreadsheet).find(t => t.getHandlerFunction() == 'onEdit_recordChanges') || null
+  // Logger.log('Project triggers:')  // 当前用户用此脚本包括在其他表的trigger，以及此脚本(非standalone)绑定那张表手动创建的trigger
+  // Logger.log(ScriptApp.getProjectTriggers().map(v => ({sourece: v.getTriggerSource(), sid: v.getTriggerSourceId(), func:v.getHandlerFunction(), type: v.getEventType(), id: v.getUniqueId()})))
+  return ScriptApp.getUserTriggers(activeSpreadsheet)
 }
 function createSpreadsheetEditTrigger() {
+  const ui = SpreadsheetApp.getUi()
   if (installInfo && installInfo.creatorEmail && installInfo.creatorEmail != userEmail) {
     ui.alert(`This sheet has been already enabled the sync by ${installInfo.creator} at ${installInfo.date}.`)
     return
@@ -320,10 +327,16 @@ function createSpreadsheetEditTrigger() {
       .forSpreadsheet(activeSpreadsheet)
       .onEdit()
       .create()
+  let myFetchTrigger = ScriptApp.newTrigger('fetchJIRADataFromLogSheet')
+      .timeBased()
+      .everyHours(1)
+      // .everyMinutes(1) // Add-on support 1 hour at least
+      .create();
   installInfo = {
     creator: userName,
     creatorEmail: userEmail,
     triggerId: myInstallTrigger.getUniqueId(),
+    triggerIdFetch: myFetchTrigger.getUniqueId(),
     date: new Date().toLocaleString(),
   }
   Properties.setProperty(installProperty, JSON.stringify(installInfo))
@@ -335,6 +348,7 @@ function createSpreadsheetEditTrigger() {
       ui.ButtonSet.OK);
   if (result == ui.Button.OK) {
     // Process the user's response.
+    menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
     menu.addItem('Stop sync this sheet', 'removeSpreadsheetEditTrigger')
     .addToUi();
   }
@@ -344,9 +358,12 @@ function createSpreadsheetEditTrigger() {
         .build();
 }
 function removeSpreadsheetEditTrigger() {
-  let myInstallTrigger = getMyInstallTrigger()
-  if (myInstallTrigger) ScriptApp.deleteTrigger(myInstallTrigger)
-  else if (installInfo && installInfo.creatorEmail && installInfo.creatorEmail != userEmail) {
+  const ui = SpreadsheetApp.getUi()
+  menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
+  let myInstallTriggers = getMyInstallTriggers()
+  if (myInstallTriggers.length > 0) {
+    myInstallTriggers.forEach(trigger => ScriptApp.deleteTrigger(trigger))
+  } else if (installInfo && installInfo.creatorEmail && installInfo.creatorEmail != userEmail) {
     ui.alert(`This sheet was synced by ${installInfo.creator}.
       Please reach out to ${installInfo.creator} to manage the sync!`)
     return
@@ -416,6 +433,7 @@ function setQueue(functionName, time, ...params) {
 /* Fetch JIRA data */
 
 function getIssues() {
+  const ui = SpreadsheetApp.getUi()
   const dataSheet = SpreadsheetApp.getActiveSheet()
   if (/.*_config$/.test(dataSheet.getName())) {ui.alert('You are not at config sheet, please swtich to data sheet!'); return}
   initHeaders()
@@ -449,6 +467,7 @@ function getIssues() {
   ui.alert("Please wait a min for data fetching!")
 }
 function expandSubIssues() {
+  const ui = SpreadsheetApp.getUi()
   const dataSheet = SpreadsheetApp.getActiveSheet()
   if (/.*_config$/.test(dataSheet.getName())) {ui.alert('You are not at config sheet, please swtich to data sheet!'); return}
   initHeaders()
@@ -480,6 +499,54 @@ function expandSubIssues() {
     }, "sheet", "getSubissuesInsert")
   }
   ui.alert("Empty row placeholder added. Please wait a min for data fetching!")
+}
+
+function fetchJIRADataFromLogSheet() {
+  const dataSS = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
+  // const dataSS = SpreadsheetApp.getActiveSpreadsheet()
+  const logSS = SpreadsheetApp.openByUrl(logSheetURL)
+
+  const dataSheets = dataSS.getSheets()
+  dataSheets.forEach(function(sheet) {
+    if (!/_config$/.test(sheet.getSheetName())) return
+    const dataSheet = dataSS.getSheetByName(sheet.getSheetName().replace('_config', ''))
+    if (!dataSheet) return
+    const logSheetName = dataSS.getName() + ': ' + dataSheet.getName()
+    let logSheet = logSS.getSheetByName(logSheetName)
+    if (!logSheet) {Logger.log(dataSheet.getName() + ': No log sheet found!'); return}
+  
+    let logs = logSheet.getDataRange().getValues()
+    let colStatus = getHeaderCol('isSync', logSheet)
+    let colFrom = getHeaderCol('from', logSheet)
+    let colAction = getHeaderCol('action', logSheet)
+    let colNewValue = getHeaderCol('new value', logSheet)
+    let colFieldDesc = getHeaderCol('JIRA field desc', logSheet)
+    let colSheetRow = getHeaderCol('sheet row', logSheet)
+    let colKey = getHeaderCol('JIRA key', logSheet)
+    logs.forEach(function(log, i) {
+      if (log[colStatus-1] == 'done') return
+      if (log[colStatus-1] == 'failed') return
+      if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'get') {
+        if (!log[colNewValue-1]) return
+        let colDataSheetColumn = getHeaderCol(log[colFieldDesc-1], dataSheet)
+        let colDataSheetJIRA = 1  // Todo
+        let dataRow = log[colSheetRow-1]
+        if (dataSheet.getRange(dataRow, colDataSheetJIRA).getValue() != log[colKey-1]) {
+          return;
+          // 检索 jira key 对应行进行修改
+          dataRow = getRowByValue(log[colKey-1], colDataSheetJIRA, dataSheet)
+          if (!dataRow) return
+        }
+        dataSheet.getRange(dataRow, colDataSheetColumn).setValue(log[colNewValue-1])
+        logSheet.getRange(i+1, colStatus).setValue('done')
+        Logger.log({logSheetName, colDataSheetColumn, colSheetRow, newValue: log[colNewValue-1]})
+      } else if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'getSubissuesInsert') {
+        // Todo
+        if (!log[colNewValue-1]) return
+      }
+    })
+    Logger.log('Fetch ' + dataSheet.getName() + ' data from log done!\n' + logSheetURL)
+  })
 }
 
 
@@ -644,9 +711,11 @@ function onEdit_maintainSyncback(e) {
   }()
 }
 function homepage_maintainSyncback() {
+  const ui = SpreadsheetApp.getUi()
   if (maintainSyncback()) ui.alert('Refresh catch successfully!')
 }
 function maintainSyncback(dataSheet = null) {
+  const ui = SpreadsheetApp.getUi()
   if (!dataSheet) {
     const activeSheet = SpreadsheetApp.getActiveSheet()
     if (!/.*_config$/.test(activeSheet.getName())) {ui.alert('You are currently not in the config sheet!'); return}
@@ -722,4 +791,18 @@ function formatDate(value) {
     const date = new Date(dateStr);
     return date.toString() === 'Invalid Date' ? null : date; // 如果日期无效，返回null
   }
+}
+
+function getHeaderCol(columnName, sheet = SpreadsheetApp.getActiveSheet()) {
+  let headerValues = sheet.getRange(1, 1, 1, 100).getValues()
+  let headerColByName = headerValues[0].reduce((pre,cur,i) => {pre[cur] = i+1; return pre}, {})
+  return headerColByName[columnName]
+}
+
+function getRowByValue(colValue, colName, sheet = SpreadsheetApp.getActiveSheet()) {
+  let col = getHeaderCol(colName, sheet)
+  if (!col) return null
+  let colValues = sheet.getRange(1, col, 100, 1).getValues()
+  let rowByColValue = colValues.reduce((pre,cur,i) => {pre[cur[0]] = i+1; return pre}, {})
+  return rowByColValue[colValue]
 }
