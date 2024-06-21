@@ -187,9 +187,11 @@ function insertJIRAColumn() {
 function onHomepage(e) {
   Logger.log('installInfo:')
   Logger.log(installInfo)
+  const ui = SpreadsheetApp.getUi()
   menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   let myInstallTriggers = getMyInstallTriggers()
   isInstalled = isInstalled || myInstallTriggers.length > 0
+  let isInstalledHourTrigger = !!myInstallTriggers.find(t => t.getHandlerFunction() == 'run_everyHour')
   // test环境不会执行 onOpen
   if (env == 'test') if (!isInstalled) menu.addItem('Sync this sheet', 'createSpreadsheetEditTrigger').addToUi()
   else menu.addItem('Stop sync this sheet', 'removeSpreadsheetEditTrigger').addToUi()
@@ -198,8 +200,8 @@ function onHomepage(e) {
   const section = CardService.newCardSection()
   section.addWidget(CardService.newTextParagraph().setText("Welcome to JIRA sync!"))
   // if (!isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Let\'s make it sync!').setWrapText(true)
-  //   .setButton(CardService.newTextButton().setText('Sync').setOnClickAction(CardService.newAction().setFunctionName("createSpreadsheetEditTrigger"))))
-  if (!isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Start sync from menu: Extensions -> JIRA sync -> Sync this sheet!').setWrapText(true))
+  //   .setButton(CardService.newTextButton().setText('Sync').setOnClickAction(CardService.newAction().setFunctionName("homepage_createSpreadsheetEditTrigger"))))
+  if (!isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Start sync from menu: Extensions -> JIRA sync -> Sync this sheet!\n\nThen refresh here.').setWrapText(true))
   if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Create config sheet').setWrapText(true)
     .setButton(CardService.newTextButton().setText('Create').setOnClickAction(CardService.newAction().setFunctionName("createConfigSheet"))))
   if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('This sheet already synced. Start with adding a column named "JIRA" with issue id!').setWrapText(true)
@@ -212,14 +214,16 @@ function onHomepage(e) {
     .setButton(CardService.newTextButton().setText('Refresh').setOnClickAction(CardService.newAction().setFunctionName("homepage_maintainSyncback"))))
   if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('You can pause sync for a while!').setWrapText(true)
     .setButton(CardService.newTextButton().setText('Pause').setOnClickAction(CardService.newAction().setFunctionName("comingSoon"))))
+  if (isInstalled && !isInstalledHourTrigger) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Re-do sync made you apply the new feature: Bidirectional-sync!').setWrapText(true)
+    .setButton(CardService.newTextButton().setText('Stop Sync').setOnClickAction(CardService.newAction().setFunctionName("homepage_removeSpreadsheetEditTrigger"))))
 
   let fixedButton = CardService.newTextButton()
   if (isInstalled) {
     fixedButton.setText("Stop sync this sheet")
     if (!myInstallTriggers.length && installInfo) fixedButton.setDisabled(true).setAltText(`The sync for this sheet is managed by ${installInfo.creator}!`)
-    fixedButton.setOnClickAction(CardService.newAction().setFunctionName("removeSpreadsheetEditTrigger"))
+    fixedButton.setOnClickAction(CardService.newAction().setFunctionName("homepage_removeSpreadsheetEditTrigger"))
   } else fixedButton.setText("Sync this sheet")
-            .setOnClickAction(CardService.newAction().setFunctionName("createSpreadsheetEditTrigger"))
+            .setOnClickAction(CardService.newAction().setFunctionName("homepage_createSpreadsheetEditTrigger"))
   let fixedFooter = CardService.newFixedFooter()
   if (isInstalled && installInfo && !myInstallTriggers.length) fixedFooter.setSecondaryButton(CardService.newTextButton().setText("i").setOnClickAction(CardService.newAction().setFunctionName("alertInstalledByOther")))
   // 从toolbar安装后的 edit trigger 别人触发不了。menu安装的可以
@@ -252,6 +256,7 @@ function comingSoon() {
 
 // Triggers
 function onInstall(e) {
+  const ui = SpreadsheetApp.getUi()
   menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   menu.addItem('Click to start!', 'openHomepage').addToUi()
   createSpreadsheetEditTrigger();
@@ -260,6 +265,7 @@ function onOpen(e) {
   Logger.log(userEmail)
   Logger.log('authMode:')
   Logger.log(e.authMode)
+  const ui = SpreadsheetApp.getUi()
   menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   try {
     Logger.log({'sheet name:': SpreadsheetApp.getActiveSpreadsheet().getName(), 'sheet tab': SpreadsheetApp.getActiveSheet().getName(), 'sheet url:': SpreadsheetApp.getActiveSpreadsheet().getUrl()})
@@ -314,6 +320,12 @@ function getMyInstallTriggers() {
   // Logger.log(ScriptApp.getProjectTriggers().map(v => ({sourece: v.getTriggerSource(), sid: v.getTriggerSourceId(), func:v.getHandlerFunction(), type: v.getEventType(), id: v.getUniqueId()})))
   return ScriptApp.getUserTriggers(activeSpreadsheet)
 }
+function homepage_createSpreadsheetEditTrigger() {
+  createSpreadsheetEditTrigger()
+  return CardService.newActionResponseBuilder()
+        .setNavigation(CardService.newNavigation().updateCard(onHomepage()))
+        .build();
+}
 function createSpreadsheetEditTrigger() {
   const ui = SpreadsheetApp.getUi()
   if (installInfo && installInfo.creatorEmail && installInfo.creatorEmail != userEmail) {
@@ -327,7 +339,7 @@ function createSpreadsheetEditTrigger() {
       .forSpreadsheet(activeSpreadsheet)
       .onEdit()
       .create()
-  let myFetchTrigger = ScriptApp.newTrigger('fetchJIRADataFromLogSheet')
+  let myFetchTrigger = ScriptApp.newTrigger('run_everyHour')
       .timeBased()
       .everyHours(1)
       // .everyMinutes(1) // Add-on support 1 hour at least
@@ -352,10 +364,10 @@ function createSpreadsheetEditTrigger() {
     menu.addItem('Stop sync this sheet', 'removeSpreadsheetEditTrigger')
     .addToUi();
   }
-
-  return CardService.newActionResponseBuilder()
-        .setNavigation(CardService.newNavigation().updateCard(onHomepage()))
-        .build();
+}
+function homepage_removeSpreadsheetEditTrigger() {
+  removeSpreadsheetEditTrigger()
+  return CardService.newNavigation().updateCard(onHomepage())
 }
 function removeSpreadsheetEditTrigger() {
   const ui = SpreadsheetApp.getUi()
@@ -375,8 +387,6 @@ function removeSpreadsheetEditTrigger() {
   isInstalled = false
   menu.addItem('Sync this sheet', 'createSpreadsheetEditTrigger').addToUi()
   ui.alert('This sheet now will not sync with JIRA ever.')
-
-  return CardService.newNavigation().updateCard(onHomepage())
 }
 
 // function onEdit(e) {
@@ -388,6 +398,10 @@ function onEdit_recordChanges(e) {
   recordChanges(e)
   onEdit_maintainSyncback(e)
   runOnEditQueue_maintainSyncback()
+}
+
+function run_everyHour() {
+  fetchJIRADataFromLogSheet()
 }
 
 // Queue class
@@ -452,6 +466,7 @@ function getIssues() {
         row,
         column,
         id: primaryJiraValue,
+        idName: primaryJiraFieldMap[primaryJiraKeyCol].name,
         field: primaryJiraFieldMap[column].name,
         fieldDesc: primaryJiraFieldMap[column].desc,
         type: primaryJiraFieldMap[column].type,
@@ -488,6 +503,7 @@ function expandSubIssues() {
       row: row,
       column: primaryJiraKeyCol,
       id: primaryJiraValue,
+      idName: primaryJiraFieldMap[primaryJiraKeyCol].name,
       field: "issuesInEpic",
       fieldDesc: "Issues in Epic",
       type: "",
@@ -522,6 +538,7 @@ function fetchJIRADataFromLogSheet() {
     let colNewValue = getHeaderCol('new value', logSheet)
     let colFieldDesc = getHeaderCol('JIRA field desc', logSheet)
     let colSheetRow = getHeaderCol('sheet row', logSheet)
+    let colKeyHeader = getHeaderCol('sheet key header', logSheet)
     let colKey = getHeaderCol('JIRA key', logSheet)
     logs.forEach(function(log, i) {
       if (log[colStatus-1] == 'done') return
@@ -529,12 +546,11 @@ function fetchJIRADataFromLogSheet() {
       if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'get') {
         if (!log[colNewValue-1]) return
         let colDataSheetColumn = getHeaderCol(log[colFieldDesc-1], dataSheet)
-        let colDataSheetJIRA = 1  // Todo
+        let colDataSheetJIRA = getHeaderCol(log[colKeyHeader-1], dataSheet)
         let dataRow = log[colSheetRow-1]
         if (dataSheet.getRange(dataRow, colDataSheetJIRA).getValue() != log[colKey-1]) {
-          return;
-          // 检索 jira key 对应行进行修改
-          dataRow = getRowByValue(log[colKey-1], colDataSheetJIRA, dataSheet)
+          // dataSheet row/column 发生错位。检索 jira key 对应行进行修改
+          dataRow = getRowByValue(log[colKey-1], log[colKeyHeader-1], dataSheet)
           if (!dataRow) return
         }
         dataSheet.getRange(dataRow, colDataSheetColumn).setValue(log[colNewValue-1])
@@ -577,10 +593,11 @@ function recordChanges(e) {
       // if (!e.oldValue) return;
       if (!primaryJiraFieldMap[column]) {Logger.log('No JIRA mapping field change!'); return}
       if (column == primaryJiraKeyCol) {Logger.log('No sync on changing JIRA key column!'); return}
-      const _jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol);
-      if (!_jiraKey.getValue()) {Logger.log('No specific JIRA key!'); return}
-
-      let data = getData(_jiraKey.getValue(), e.oldValue, e.value, primaryJiraFieldMap)
+      const jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol).getValue();
+      if (!jiraKey) {Logger.log('No specific JIRA key!'); return}
+      
+      const jiraKeyName = range.getSheet().getRange(1, primaryJiraKeyCol).getValue();
+      let data = getData(jiraKey, jiraKeyName, e.oldValue, e.value, primaryJiraFieldMap)
       Logger.log(data)
       _syncDataToLogSheet(data)
     } else {
@@ -592,10 +609,11 @@ function recordChanges(e) {
           if (!primaryJiraFieldMap[column]) {Logger.log('Row:'+row+' Column:'+column + '. No JIRA mapping field change!'); continue}
           if (column == primaryJiraKeyCol) {Logger.log('Row:'+row+' Column:'+column + '. No sync on changing JIRA key column!'); continue}
           if (!value) continue
-          const _jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol);
-          if (!_jiraKey.getValue()) {Logger.log('Row:'+row+' Column:'+column + '. No specific JIRA key!'); continue}
-
-          let data = getData(_jiraKey.getValue(), row==range.getRow()&&column==range.getColumn()?e.oldValue:'', value, primaryJiraFieldMap, row, column)
+          const jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol).getValue();
+          if (!jiraKey) {Logger.log('Row:'+row+' Column:'+column + '. No specific JIRA key!'); continue}
+          
+          const jiraKeyName = range.getSheet().getRange(1, primaryJiraKeyCol).getValue();
+          let data = getData(jiraKey, jiraKeyName, row==range.getRow()&&column==range.getColumn()?e.oldValue:'', value, primaryJiraFieldMap, row, column)
           Logger.log(data)
           _syncDataToLogSheet(data)
         }
@@ -611,10 +629,11 @@ function recordChanges(e) {
       if (secondaryJiraKeyCol === null) return;
       if (!secondaryJiraFieldMap[column]) return;
       if (column == secondaryJiraKeyCol) return;
-      const _jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol);
-      if (!_jiraKey.getValue()) return;
-
-      let data = getData(_jiraKey.getValue(), e.oldValue, e.value, secondaryJiraFieldMap)
+      const jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol).getValue();
+      if (!jiraKey) return;
+      
+      const jiraKeyName = range.getSheet().getRange(1, secondaryJiraKeyCol).getValue();
+      let data = getData(jiraKey, jiraKeyName, e.oldValue, e.value, secondaryJiraFieldMap)
       Logger.log(data)
       _syncDataToLogSheet(data)
     } else {
@@ -625,10 +644,11 @@ function recordChanges(e) {
           if (!secondaryJiraFieldMap[column]) continue
           if (column == secondaryJiraKeyCol) continue
           if (!value) continue
-          const _jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol);
-          if (!_jiraKey.getValue()) continue
-
-          let data = getData(_jiraKey.getValue(), row==range.getRow()&&column==range.getColumn()?e.oldValue:'', value, secondaryJiraFieldMap, row, column)
+          const jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol).getValue();
+          if (!jiraKey) continue
+          
+          const jiraKeyName = range.getSheet().getRange(1, secondaryJiraKeyCol).getValue();
+          let data = getData(jiraKey, jiraKeyName, row==range.getRow()&&column==range.getColumn()?e.oldValue:'', value, secondaryJiraFieldMap, row, column)
           Logger.log(data)
           _syncDataToLogSheet(data)
         }
@@ -636,7 +656,7 @@ function recordChanges(e) {
     }
   }()
 
-  function getData(id, oldValue, newValue, JiraFieldMap = primaryJiraFieldMap, row = row, column = column) {
+  function getData(id, idName, oldValue, newValue, JiraFieldMap = primaryJiraFieldMap, row = row, column = column) {
     // Format with custom function
     newValue = JiraFieldMap[column].formatFuc ? JiraFieldMap[column].formatFuc(newValue) : newValue
     // Format date
@@ -645,7 +665,8 @@ function recordChanges(e) {
     return {
       row,
       column,
-      id: id,
+      id,
+      idName,
       field: JiraFieldMap[column].name,
       fieldDesc: JiraFieldMap[column].desc,
       type: JiraFieldMap[column].type,
@@ -666,10 +687,10 @@ function _syncDataToLogSheet(data, from = "sheet", action = "") {
   let logSheet = logSS.getSheetByName(logSheetName)
   if (!logSheet) {
     logSheet = logSS.insertSheet(logSheetName)
-    logSheet.appendRow(["editor", "from", "action", "old value", "new value", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "time", "isSync", "sync time", "took seconds", "fail reason"]);
+    logSheet.appendRow(["editor", "from", "action", "old value", "new value", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "sheet key header", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "time", "isSync", "sync time", "took seconds", "fail reason"]);
   }
 
-  logSheet.appendRow([userEmail, from, action||(data.isChangeAsAdding?'add':'replace'), data.oldValue, data.prefix+data.newValue+data.suffix, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+activeSheet.getSheetId(), activeSheet.getName(), activeSheet.getSheetId(), data.row, data.column, `=HYPERLINK("https://jira.ringcentral.com/browse/${data.id}", "${data.id}")`, data.fieldDesc, data.field, data.type, new Date().toLocaleString()]);
+  logSheet.appendRow([userEmail, from, action||(data.isChangeAsAdding?'add':'replace'), data.oldValue, data.prefix+data.newValue+data.suffix, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+activeSheet.getSheetId(), activeSheet.getName(), activeSheet.getSheetId(), data.row, data.column, data.idName, `=HYPERLINK("https://jira.ringcentral.com/browse/${data.id}", "${data.id}")`, data.fieldDesc, data.field, data.type, new Date().toLocaleString()]);
   Logger.log('Sync log successfully!\n' + logSheetURL)
 }
 
@@ -800,6 +821,7 @@ function getHeaderCol(columnName, sheet = SpreadsheetApp.getActiveSheet()) {
 }
 
 function getRowByValue(colValue, colName, sheet = SpreadsheetApp.getActiveSheet()) {
+  if (!colName) return null
   let col = getHeaderCol(colName, sheet)
   if (!col) return null
   let colValues = sheet.getRange(1, col, 100, 1).getValues()
