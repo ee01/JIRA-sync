@@ -23,7 +23,7 @@ const syncbackSheetURL = env == 'production' ? 'https://docs.google.com/spreadsh
 /* ------------------------- Replace following code to upgrade ------------------------------------------ */
 
 
-const jiraFields = ['summary', 'priority', 'description', 'assignee', 'reporter', 'labels', 'components', 'issuetype', 'duedate', 'fixversions', 'status']
+const jiraFields = ['summary', 'priority', 'description', 'assignee', 'reporter', 'labels', 'components', 'issuetype', 'duedate', 'fixversions', 'status']  // Deprecated: Use config sheet to manage
 const installProperty = 'install-onEdit_recordChanges'
 const userEmail = Session.getActiveUser().getEmail()
 const userName =  userEmail.split('@')[0].replace('.', ' ')
@@ -67,22 +67,19 @@ function getHeaders(dataSheet = null, startCol = 1) {
 
   const configFiledsByColum = getFieldsConfig(dataSheet, headers, startCol)
   for (var col in headers) {
-    headers[col] = {name: headers[col], row: 1, col}
-    if (headers[col].name == 'JIRA')  {primaryJiraKeyCol = parseInt(col) + 1; continue} // 存储默认JIRA key字段
+    if (!headers[col]) continue
+    headers[col] = {name: headers[col], row: 1, col: col+1}
+    if (headers[col].name == 'JIRA key')  {primaryJiraKeyCol = parseInt(col) + 1; continue} // 存储默认JIRA key字段
     if (configFiledsByColum[ headers[col].name ]) {
       headers[col] = configFiledsByColum[ headers[col].name ]
       headers[col].row = 1
-      headers[col].col = col
+      headers[col].col = parseInt(col) + 1
       // 存储JIRA key字段
-      if (headers[col].name == 'JIRA') {
-        if (startCol == 1) primaryJiraKeyCol = parseInt(col) + 1
-        else secondaryJiraKeyCol = parseInt(col) + 1
-      }
-      // 第二个jira key列需要同步的字段需在第一个同步字段列表中排除
-      if (startCol != 1 && headers[col].name != 'JIRA') delete primaryJiraFieldMap[parseInt(col)+1]
+      if (headers[col].name == 'JIRA key') primaryJiraKeyCol = parseInt(col) + 1
+      else if (headers[col].name == 'link key') secondaryJiraKeyCol = parseInt(col) + 1
       continue
     }
-    if (new Set(jiraFields).has(headers[col].name.toLowerCase()) && startCol == 1) continue
+    // if (new Set(jiraFields).has(headers[col].name.toLowerCase()) && startCol == 1) continue // 通过预设字段自动同步
     delete headers[col]
   }
   headers.unshift(null)
@@ -100,7 +97,7 @@ function getFieldsConfig(dataSheet = null, headers = [], startCol = 1) {
     let didCreateConfigSheet = Properties.getProperty('did-create-config') || false
     if (didCreateConfigSheet) return {}
     // 针对带有 JIRA 表头的第一次修改，创建一张config表给用户配置
-    if (!new Set(headers).has('JIRA') && !new Set(headers).has('JIRA ID')) return {}
+    if (!new Set(headers).has('JIRA') && !new Set(headers).has('JIRA key')) return {}
     _createConfigSheet(configSheetName)
     Logger.log(configSheetName)
     let configSheetNames = Properties.getProperty('did-create-config') || []
@@ -123,7 +120,7 @@ function getFieldsConfig(dataSheet = null, headers = [], startCol = 1) {
       formatFuc: function(value) {
         if (!x[7]) return value
         try{
-          return eval(x[7].replace('{value}', '"'+value+'"'))
+          return eval(x[7].replaceAll('{value}', '"'+value+'"'))
         }catch{
           return value
         }
@@ -137,6 +134,7 @@ function getFieldsConfig(dataSheet = null, headers = [], startCol = 1) {
 
 function createConfigSheet() {
   const ui = SpreadsheetApp.getUi()
+  const Properties = PropertiesService.getDocumentProperties()
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   const activeSheet = SpreadsheetApp.getActiveSheet()
   const configSheetName = activeSheet.getName() + '_config'
@@ -144,19 +142,25 @@ function createConfigSheet() {
   if (configSheet) { ui.alert('Config sheet already exist!'); return }
   if (/.*_config$/.test(activeSheet.getName())) { ui.alert('You now stay on a config sheet!'); return }
   _createConfigSheet(configSheetName)
+  let configSheetNames = Properties.getProperty('did-create-config') || []
+  configSheetNames.push(configSheetName)
+  Properties.setProperty('did-create-config', configSheetNames);
 }
 function _createConfigSheet(configSheetName) {
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   configSheet = activeSpreadsheet.insertSheet(configSheetName)
-  configSheet.appendRow(["Sheet Column", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "", "Sheet Column for another ticket in same row", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function"]);  // 如修改，请同步修改 countConfigColumns, fieldsConfigBySheetcolumn
+  configSheet.appendRow(["Sheet Column", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "", "Sheet Column - link ticket", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function"]);  // 如修改，请同步修改 countConfigColumns, fieldsConfigBySheetcolumn
   configSheet.getRange(1, 1, 1, 50).setFontWeight("bold")
-  configSheet.appendRow(["JIRA ID", "JIRA"]);
+  configSheet.appendRow(["JIRA", "JIRA key", "", "", "", "", "", "", "", "UX Ticket", "link key"]);
   configSheet.appendRow(["Title", "summary", "2-ways", "text"]);
+  configSheet.appendRow(["Type", "issuetype", "Back", "text"]);
   configSheet.appendRow(["Label", "labels", "To", "list", "Yes"]);
-  configSheet.appendRow(["Release", "fixVersions", "2-ways", "list", "No", "mThor "]);
+  configSheet.appendRow(["Component", "components", "2-ways", "list", "No"]);
+  configSheet.appendRow(["Release", "fixVersions", "2-ways", "list", "No", "", "", "{value}=='Video Wishlist'?{value}:'mThor '+{value}"]);
   configSheet.appendRow(["Affect versions", "versions", "2-ways", "list", "No", "mThor "]);
   configSheet.appendRow(["Due date", "duedate", "2-ways", "date"]);
   configSheet.appendRow(["BV", "customfield_10423", "2-ways", "text"]);
+  configSheet.appendRow(["Priority", "Priority", "2-ways", "text"]);
   configSheet.appendRow(["Sprint", "customfield_10652", "2-ways", "list", "No"]);
   configSheet.appendRow(["Team", "customfield_17553", "2-ways", "list", "No"]);
   configSheet.appendRow(["Story Point", "customfield_10422", "2-ways", "text"]);
@@ -172,14 +176,14 @@ function _createConfigSheet(configSheetName) {
   configSheet.appendRow(["Exist on Production", "customfield_10570", "2-ways", "text"]);
   configSheet.appendRow(["Affect customers", "customfield_13250", "2-ways", "text"]);
   configSheet.appendRow(["DEA", "customfield_26055", "2-ways", "list", "No"]);
-  configSheet.appendRow(["UX Ticket", "links:depends on", "2-ways", "link"]);
+  configSheet.appendRow(["UX Ticket", "depends on", "2-ways", "link"]);
   configSheet.appendRow(["Status", "status", "Back", "text"]);
 }
 
 function insertJIRAColumn() {
   const activeSheet = SpreadsheetApp.getActiveSheet()
   let JIRAcolumn = activeSheet.insertColumnBefore(1)
-  JIRAcolumn.getRange(1, 1).setValue('JIRA')
+  JIRAcolumn.getRange(1, 1).setValue('JIRA key')
 }
 
 
@@ -191,7 +195,7 @@ function onHomepage(e) {
   menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   let myInstallTriggers = getMyInstallTriggers()
   isInstalled = isInstalled || myInstallTriggers.length > 0
-  let isInstalledHourTrigger = !!myInstallTriggers.find(t => t.getHandlerFunction() == 'run_everyHour')
+  let isInstalledHourTrigger = !!myInstallTriggers.find(t => t.getHandlerFunction() == '_runEveryHour')
   // test环境不会执行 onOpen
   if (env == 'test') if (!isInstalled) menu.addItem('Sync this sheet', 'createSpreadsheetEditTrigger').addToUi()
   else menu.addItem('Stop sync this sheet', 'removeSpreadsheetEditTrigger').addToUi()
@@ -211,7 +215,7 @@ function onHomepage(e) {
   if (isInstalled) section.addWidget(CardService.newDecoratedText().setText('Expand the sub issues to the Epic!').setWrapText(true)
     .setButton(CardService.newTextButton().setText('Expand').setOnClickAction(CardService.newAction().setFunctionName("expandSubIssues"))))
   if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('If you change the config sheet, please refresh the catch for data sync back!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Refresh').setOnClickAction(CardService.newAction().setFunctionName("homepage_maintainSyncback"))))
+    .setButton(CardService.newTextButton().setText('Refresh').setOnClickAction(CardService.newAction().setFunctionName("homepage_indexSyncback"))))
   if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('You can pause sync for a while!').setWrapText(true)
     .setButton(CardService.newTextButton().setText('Pause').setOnClickAction(CardService.newAction().setFunctionName("comingSoon"))))
   if (isInstalled && !isInstalledHourTrigger) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Re-do sync made you apply the new feature: Bidirectional-sync!').setWrapText(true)
@@ -335,11 +339,15 @@ function createSpreadsheetEditTrigger() {
 
   const Properties = PropertiesService.getDocumentProperties()
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
-  let myInstallTrigger = ScriptApp.newTrigger('onEdit_recordChanges')
+  let myInstallTrigger = ScriptApp.newTrigger('_onEdit')
       .forSpreadsheet(activeSpreadsheet)
       .onEdit()
       .create()
-  let myFetchTrigger = ScriptApp.newTrigger('run_everyHour')
+  let myChangeTrigger = ScriptApp.newTrigger('_onChange')
+      .forSpreadsheet(activeSpreadsheet)
+      .onChange()
+      .create()
+  let myFetchTrigger = ScriptApp.newTrigger('_runEveryHour')
       .timeBased()
       .everyHours(1)
       // .everyMinutes(1) // Add-on support 1 hour at least
@@ -348,6 +356,7 @@ function createSpreadsheetEditTrigger() {
     creator: userName,
     creatorEmail: userEmail,
     triggerId: myInstallTrigger.getUniqueId(),
+    triggerIdChange: myChangeTrigger.getUniqueId(),
     triggerIdFetch: myFetchTrigger.getUniqueId(),
     date: new Date().toLocaleString(),
   }
@@ -393,20 +402,34 @@ function removeSpreadsheetEditTrigger() {
   // onEdit_recordChanges(e)
 // }
 
-function onEdit_recordChanges(e) {
+function _onEdit(e) {
   Logger.log({user: userEmail, sheet: SpreadsheetApp.getActiveSpreadsheet().getName(), tab: SpreadsheetApp.getActiveSheet().getName(), col: e.range.getColumn(), row: e.range.getRow()})
   recordChanges(e)
-  onEdit_maintainSyncback(e)
-  runOnEditQueue_maintainSyncback()
+  onEdit_indexSyncback(e)
+  runQueue()  // Run queue to sync syncback index data
+}
+function onEdit_recordChanges(e) {  // Deprecated: but keep it for the compatibility
+  _onEdit(e)
 }
 
-function run_everyHour() {
+function _onChange(e) {
+  Logger.log({user: userEmail, sheet: SpreadsheetApp.getActiveSpreadsheet().getName(), tab: SpreadsheetApp.getActiveSheet().getName(), type: e.changeType})
+  onChange_indexSyncback(e)
+  runQueue()  // Run queue to sync syncback index data
+}
+
+function _runEveryHour() {
   fetchJIRADataFromLogSheet()
+  runQueue()  // Run queue to sync syncback index data
 }
 
 // Queue class
-function runOnEditQueue_maintainSyncback() {
+const queueIntevalSeconds = 15
+function runQueue() {
   const Properties = PropertiesService.getDocumentProperties()
+  let isBusy = Properties.getProperty('is-queue-instant-busy')
+  if (isBusy && new Date(isBusy).getTime() > new Date().getTime() - 2 * queueIntevalSeconds * 1000) {Logger.log('Other queue instant is running now!'); return}
+  Properties.setProperty('is-queue-instant-busy', new Date())
   let queue = []
   try { queue = JSON.parse(Properties.getProperty('queue-to-run')) || [] } catch {}
   Logger.log('queue:')
@@ -418,13 +441,20 @@ function runOnEditQueue_maintainSyncback() {
     if (new Date(job.time).getTime() > new Date().getTime()) return
     if (!job.functionName) return
     if (job.params) paramsToQueueFunc[job.functionName] = job.params || []
+    if (!job.status == 'running') return
+    queue[i].status = 'running'
+    Properties.setProperty('queue-to-run', JSON.stringify(queue))
     try {
       eval(job.functionName + '(...paramsToQueueFunc.'+job.functionName+')')
       queue.splice(i, 1)
       Properties.setProperty('queue-to-run', JSON.stringify(queue))
+    } catch {
+      queue[i].status = 'failed'
+      Properties.setProperty('queue-to-run', JSON.stringify(queue))
+      Logger.log('Run queue function failed: ' + job.functionName)
     }
-    catch { Logger.log('Run queue function failed: ' + job.functionName) }
   })
+  Properties.deleteProperty('is-queue-instant-busy')
 }
 function setQueue(functionName, time, ...params) {
   const Properties = PropertiesService.getDocumentProperties()
@@ -589,7 +619,7 @@ function recordChanges(e) {
   // 推送第一字段列表的变化给JIRA
   !function(){
     if (!isMultiple) {
-      if (!e.value) return;
+      if (e.value === '') return;
       // if (!e.oldValue) return;
       if (!primaryJiraFieldMap[column]) {Logger.log('No JIRA mapping field change!'); return}
       if (column == primaryJiraKeyCol) {Logger.log('No sync on changing JIRA key column!'); return}
@@ -602,18 +632,18 @@ function recordChanges(e) {
       _syncDataToLogSheet(data)
     } else {
       let values = range.getValues()
-      for (var row = range.getRow(); row < range.getRow() + range.getNumRows(); row++) {
-        for (var column = range.getColumn(); column < range.getColumn() + range.getNumColumns(); column++) {
-          let value = values[row-range.getRow()][column-range.getColumn()]
-          Logger.log({value_range: value, row, column})
-          if (!primaryJiraFieldMap[column]) {Logger.log('Row:'+row+' Column:'+column + '. No JIRA mapping field change!'); continue}
-          if (column == primaryJiraKeyCol) {Logger.log('Row:'+row+' Column:'+column + '. No sync on changing JIRA key column!'); continue}
+      for (var r = row; r < row + range.getNumRows(); r++) {
+        for (var c = column; c < column + range.getNumColumns(); c++) {
+          let value = values[r-row][c-column]
+          // Logger.log({value_range: value, r, c})
+          if (!primaryJiraFieldMap[c]) {Logger.log('Row:'+r+' Column:'+c + '. No JIRA mapping field change!'); continue}
+          if (c == primaryJiraKeyCol) {Logger.log('Row:'+r+' Column:'+c + '. No sync on changing JIRA key column!'); continue}
           if (!value) continue
-          const jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol).getValue();
-          if (!jiraKey) {Logger.log('Row:'+row+' Column:'+column + '. No specific JIRA key!'); continue}
+          const jiraKey = range.getSheet().getRange(r, primaryJiraKeyCol).getValue();
+          if (!jiraKey) {Logger.log('Row:'+r+' Column:'+c + '. No specific JIRA key!'); continue}
           
           const jiraKeyName = range.getSheet().getRange(1, primaryJiraKeyCol).getValue();
-          let data = getData(jiraKey, jiraKeyName, row==range.getRow()&&column==range.getColumn()?e.oldValue:'', value, primaryJiraFieldMap, row, column)
+          let data = getData(jiraKey, jiraKeyName, r==row&&c==column?e.oldValue:'', value, primaryJiraFieldMap, r, c)
           Logger.log(data)
           _syncDataToLogSheet(data)
         }
@@ -624,7 +654,7 @@ function recordChanges(e) {
   // 推送第二字段列表的变化给JIRA
   !function(){
     if (!isMultiple) {
-      if (!e.value) return;
+      if (e.value === '') return;
       // if (!e.oldValue) return;
       if (secondaryJiraKeyCol === null) return;
       if (!secondaryJiraFieldMap[column]) return;
@@ -638,17 +668,17 @@ function recordChanges(e) {
       _syncDataToLogSheet(data)
     } else {
       let values = range.getValues()
-      for (var row = range.getRow(); row < range.getRow() + range.getNumRows(); row++) {
-        for (var column = range.getColumn(); column < range.getColumn() + range.getNumColumns(); column++) {
-          let value = values[row-range.getRow()][column-range.getColumn()]
-          if (!secondaryJiraFieldMap[column]) continue
-          if (column == secondaryJiraKeyCol) continue
+      for (var r = row; r < row + range.getNumRows(); r++) {
+        for (var c = column; c < column + range.getNumColumns(); c++) {
+          let value = values[r-row][c-column]
+          if (!secondaryJiraFieldMap[c]) continue
+          if (c == secondaryJiraKeyCol) continue
           if (!value) continue
-          const jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol).getValue();
+          const jiraKey = range.getSheet().getRange(r, secondaryJiraKeyCol).getValue();
           if (!jiraKey) continue
           
           const jiraKeyName = range.getSheet().getRange(1, secondaryJiraKeyCol).getValue();
-          let data = getData(jiraKey, jiraKeyName, row==range.getRow()&&column==range.getColumn()?e.oldValue:'', value, secondaryJiraFieldMap, row, column)
+          let data = getData(jiraKey, jiraKeyName, r==row&&c==column?e.oldValue:'', value, secondaryJiraFieldMap, r, c)
           Logger.log(data)
           _syncDataToLogSheet(data)
         }
@@ -694,10 +724,10 @@ function _syncDataToLogSheet(data, from = "sheet", action = "") {
   Logger.log('Sync log successfully!\n' + logSheetURL)
 }
 
-/* Maintain sync back index sheet */
+/* Reindex sync back index sheet */
 
-// 修改配置表的时候，维护一张 sync back 表 供 JIRA webhook 调用的时候索引 Tickets
-function onEdit_maintainSyncback(e) {
+// 修改配置表的时候，维护一张 sync back 索引表供 JIRA webhook 调用的时候索引 Tickets
+function onEdit_indexSyncback(e) {
   const range = e.range;
   const column = range.getColumn();
   const row = range.getRow();
@@ -712,30 +742,69 @@ function onEdit_maintainSyncback(e) {
     if (!dataSheet) {Logger.log('No found data sheet, quit!'); return}
     if (!/.*_config$/.test(configSheet.getName())) return
     if (column != 1 && column != 1 + 1
-      && column != 2 + countConfigColumns && column != 2 + countConfigColumns + 1) {Logger.log('Auto update syncback config is only trigger by field name changes!'); return}
+      && column != 2 + countConfigColumns && column != 2 + countConfigColumns + 1) {Logger.log('Auto update syncback index is only trigger by field name changes!'); return}
 
     // Throttle
-    setQueue('maintainSyncback', new Date().getTime() + 2 * 1000, dataSheet.getName())
-    // maintainSyncback(dataSheet)
+    setQueue('indexSyncback', new Date().getTime() + queueIntevalSeconds * 1000, dataSheet.getName())
+    // indexSyncback(dataSheet) // Instead of run directly, add to queue above
   }()
 
   // Data sheet new JIRA key added
   !function(){
     if (!e.value) return;
     if (e.oldValue) return; // only add JIRA key
+    // Todo: 支持 copy/paste
     const dataSheet = SpreadsheetApp.getActiveSheet()
     if (/.*_config$/.test(dataSheet.getName())) return
-    if (column != primaryJiraKeyCol && column != secondaryJiraKeyCol) {Logger.log('Auto update syncback config is only trigger by JIRA key added!'); return}
+    const configSheetName = dataSheet.getName() + '_config'
+    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(configSheetName)
+    if (!configSheet) {Logger.log('No found config sheet, quit!'); return}
+    initHeaders(dataSheet, true)
+    if (column != primaryJiraKeyCol && column != secondaryJiraKeyCol) {Logger.log('Auto update syncback index is only trigger by JIRA key added!'); return}
 
     // Throttle
-    setQueue('maintainSyncback', new Date().getTime() + 2 * 1000, dataSheet.getName())
+    setQueue('indexSyncback', new Date().getTime() + queueIntevalSeconds * 1000, dataSheet.getName())
   }()
+
+  /* Deprecated: use onChange_indexSyncback instead
+  // Data sheet new row inserted (delete cannot be supported in onEdit trigger)
+  !function(){
+    if (e.value) return;
+    if (e.oldValue) return;
+    const isMultiple = !!(range.getNumRows() || range.getNumColumns())
+    if (!isMultiple) return;
+    const dataSheet = SpreadsheetApp.getActiveSheet()
+    if (/.*_config$/.test(dataSheet.getName())) return
+    const configSheetName = dataSheet.getName() + '_config'
+    const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(configSheetName)
+    if (!configSheet) {Logger.log('No found config sheet, quit!'); return}
+    let values = range.getValues()
+    if (values.some(rowValues => rowValues.some(cell => cell !== ''))) return // 但其实插入行列和清空操作是一样的，cell全为空
+
+    // Throttle
+    setQueue('indexSyncback', new Date().getTime() + queueIntevalSeconds * 1000, dataSheet.getName())
+  }() */
 }
-function homepage_maintainSyncback() {
+
+// 表头变化需要用 onChange
+function onChange_indexSyncback(e) {
+  const dataSheet = SpreadsheetApp.getActiveSheet()
+  if (/.*_config$/.test(dataSheet.getName())) return
+  const configSheetName = dataSheet.getName() + '_config'
+  const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(configSheetName)
+  if (!configSheet) {Logger.log('No found config sheet, quit!'); return}
+  if (!/^INSERT_ROW|INSERT_COLUMN|REMOVE_ROW|REMOVE_COLUMN$/.test(e.changeType)) return
+  Logger.log('Data sheet structure changed: ' + e.changeType)
+
+  // Throttle
+  setQueue('indexSyncback', new Date().getTime() + queueIntevalSeconds * 1000, dataSheet.getName())
+}
+
+function homepage_indexSyncback() {
   const ui = SpreadsheetApp.getUi()
-  if (maintainSyncback()) ui.alert('Refresh catch successfully!')
+  if (indexSyncback()) ui.alert('Refresh catch successfully!')
 }
-function maintainSyncback(dataSheet = null) {
+function indexSyncback(dataSheet = null) {
   const ui = SpreadsheetApp.getUi()
   if (!dataSheet) {
     const activeSheet = SpreadsheetApp.getActiveSheet()
@@ -746,8 +815,9 @@ function maintainSyncback(dataSheet = null) {
 
   initHeaders(dataSheet, true)
   // Logger.log(primaryJiraFieldMap)
-  let dataValues = dataSheet.getRange(2, 1, 500, primaryJiraFieldMap.length).getValues()
   let tickets = []
+  // Primary JIRA columns index
+  let dataValues = dataSheet.getRange(2, 1, 500, primaryJiraFieldMap.length).getValues()
   for (var r in dataValues) {
     if (!dataValues[r][primaryJiraKeyCol-1]) continue
     // Logger.log(dataValues[r])
@@ -766,6 +836,28 @@ function maintainSyncback(dataSheet = null) {
         removePrefix: primaryJiraField.prefix,
         removeSuffix: primaryJiraField.suffix,
         // backFormatFunc: primaryJiraField.formatFuc, // Todo
+      })
+    }
+  }
+  // Secondary JIRA columns index
+  for (var r in dataValues) {
+    if (!dataValues[r][secondaryJiraKeyCol-1]) continue
+    // Logger.log(dataValues[r])
+    for (var c in dataValues[r]) {
+      const secondaryJiraField = secondaryJiraFieldMap[parseInt(c)+1]
+      if (!secondaryJiraField) continue
+      if (parseInt(c)+1 == secondaryJiraKeyCol) continue
+      tickets.push({
+        jiraKey: dataValues[r][secondaryJiraKeyCol-1],
+        row: parseInt(r) + 1 + 1,
+        column: parseInt(c) + 1,
+        fieldName: secondaryJiraField.name,
+        fieldDesc: secondaryJiraField.desc,
+        fieldType: secondaryJiraField.type,
+        isListAllValue: secondaryJiraField.isChangeAsAdding ? 'editing' : 'all',  // Todo: 'max'
+        removePrefix: secondaryJiraField.prefix,
+        removeSuffix: secondaryJiraField.suffix,
+        // backFormatFunc: secondaryJiraField.formatFuc, // Todo
       })
     }
   }
@@ -788,7 +880,7 @@ function _syncTicketsToSyncbackSheet(tickets = [], dataSheet) {
   // })
   let rangeValues = tickets.map(ticket => [userEmail, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId(), dataSheet.getName(), dataSheet.getSheetId(), ticket.row, ticket.column, ticket.isListAllValue, ticket.prefix, ticket.suffix, ticket.backFormatFunc])
   syncbackSheet.getRange(2, 1, rangeValues.length, rangeValues[0].length).setValues(rangeValues)
-  Logger.log('Sync syncback config successfully!\n' + syncbackSheetURL)
+  Logger.log('Sync syncback index successfully!\n' + syncbackSheetURL)
   return true
 }
 

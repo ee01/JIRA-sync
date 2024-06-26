@@ -32,11 +32,11 @@
       "universalActions": [
         {
           "label": "Sync",
-          "runFunction": "createSpreadsheetEditTrigger"
+          "runFunction": "homepage_createSpreadsheetEditTrigger"
         },
         {
           "label": "Stop sync",
-          "runFunction": "removeSpreadsheetEditTrigger"
+          "runFunction": "homepage_removeSpreadsheetEditTrigger"
         }
       ]
     },
