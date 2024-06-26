@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-6-14 （版本更新勿替换Configurations区域）
+ * Version: 2024-6-26 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -178,6 +178,40 @@ function _createConfigSheet(configSheetName) {
   configSheet.appendRow(["DEA", "customfield_26055", "2-ways", "list", "No"]);
   configSheet.appendRow(["UX Ticket", "depends on", "2-ways", "link"]);
   configSheet.appendRow(["Status", "status", "Back", "text"]);
+}
+
+function onEdit_markSyncHeaders(e) {
+  const range = e.range;
+  const column = range.getColumn();
+  const row = range.getRow();
+  if (row == 1) {Logger.log('Header change, quit!'); return}
+  if (!e.value) return;
+  const configSheet = SpreadsheetApp.getActiveSheet()
+  const dataSheetName = configSheet.getName().replace(/_config$/, "")
+  const dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(dataSheetName)
+  if (!dataSheet) {Logger.log('No found data sheet, quit!'); return}
+  if (!/.*_config$/.test(configSheet.getName())) return
+  if (column != 1 && column != 1 + 1
+    && column != 2 + countConfigColumns && column != 2 + countConfigColumns + 1) {Logger.log('Mark synced headers is only trigger by field name changes!'); return}
+
+  // Throttle
+  setQueue('markSyncHeaders', new Date().getTime() + queueIntevalSeconds * 1000, dataSheet.getName())
+}
+function markSyncHeaders(dataSheetName = null) {
+  const dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(dataSheetName)
+  const configSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(dataSheetName + '_config')
+  if (!dataSheet) return
+  if (!configSheet) return
+
+  let columnValues = configSheet.getRange(2, 1, 100, 1).getValues()
+  let columnNames = columnValues.map(v => v[0])
+  for (var col = 1; col <= 100; col++) {
+    let headerCell = dataSheet.getRange(1, col)
+    let headerValue = headerCell.getValue()
+    if (!headerValue) continue
+    if (columnNames.includes(headerValue)) headerCell.setNote('This column is synced with JIRA')
+    else headerCell.clearNote()
+  }
 }
 
 function insertJIRAColumn() {
@@ -405,8 +439,9 @@ function removeSpreadsheetEditTrigger() {
 function _onEdit(e) {
   Logger.log({user: userEmail, sheet: SpreadsheetApp.getActiveSpreadsheet().getName(), tab: SpreadsheetApp.getActiveSheet().getName(), col: e.range.getColumn(), row: e.range.getRow()})
   recordChanges(e)
+  onEdit_markSyncHeaders(e)
   onEdit_indexSyncback(e)
-  runQueue()  // Run queue to sync syncback index data
+  // runQueue()  // Run queue to sync syncback index data
 }
 function onEdit_recordChanges(e) {  // Deprecated: but keep it for the compatibility
   _onEdit(e)
