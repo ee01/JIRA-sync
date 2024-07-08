@@ -583,20 +583,25 @@ function expandSubIssues() {
 }
 
 function fetchJIRADataFromLogSheet() {
-  const dataSS = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
-  // const dataSS = SpreadsheetApp.getActiveSpreadsheet()
+  // const dataSS = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
+  const dataSS = SpreadsheetApp.getActiveSpreadsheet()
   const logSS = SpreadsheetApp.openByUrl(logSheetURL)
+  const dataSSId = dataSS.getId()
 
   const dataSheets = dataSS.getSheets()
   dataSheets.forEach(function(sheet) {
     if (!/_config$/.test(sheet.getSheetName())) return
     const dataSheet = dataSS.getSheetByName(sheet.getSheetName().replace('_config', ''))
     if (!dataSheet) return
-    const logSheetName = dataSS.getName() + ': ' + dataSheet.getName()
+    // const logSheetName = dataSS.getName() + ': ' + dataSheet.getName()
+    const logSheetName = 'changelog'
     let logSheet = logSS.getSheetByName(logSheetName)
     if (!logSheet) {Logger.log(dataSheet.getName() + ': No log sheet found!'); return}
   
+    const sheetId = sheet.getSheetId()
     let logs = logSheet.getDataRange().getValues()
+    let colSheetUrl = getHeaderCol('sheet URL', logSheet)
+    let colSheetTabGid = getHeaderCol('sheet tab gid', logSheet)
     let colStatus = getHeaderCol('isSync', logSheet)
     let colFrom = getHeaderCol('from', logSheet)
     let colAction = getHeaderCol('action', logSheet)
@@ -606,6 +611,8 @@ function fetchJIRADataFromLogSheet() {
     let colKeyHeader = getHeaderCol('sheet key header', logSheet)
     let colKey = getHeaderCol('JIRA key', logSheet)
     logs.forEach(function(log, i) {
+      if (!RegExp(dataSSId).test(log[colSheetUrl-1])) return
+      if (log[colSheetTabGid-1] != sheetId) return
       if (log[colStatus-1] == 'done') return
       if (log[colStatus-1] == 'failed') return
       if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'get') {
@@ -748,7 +755,8 @@ function _syncDataToLogSheet(data, from = "sheet", action = "") {
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   const activeSheet = SpreadsheetApp.getActiveSheet()
   const logSS = SpreadsheetApp.openByUrl(logSheetURL)
-  const logSheetName = activeSpreadsheet.getName() + ': ' + activeSheet.getName()
+  // const logSheetName = activeSpreadsheet.getName() + ': ' + activeSheet.getName()
+  const logSheetName = 'changelog'
   let logSheet = logSS.getSheetByName(logSheetName)
   if (!logSheet) {
     logSheet = logSS.insertSheet(logSheetName)
