@@ -1,0 +1,169 @@
+{
+	"editor": "{{initiator.emailAddress}}",
+	"source": "jira",
+	"action": "replace",
+	"jira_key": "{{issue.key}}",
+	"fields": [{
+		"field_desc": "summary",
+		"field_name": "summary",
+		"field_type": "text",
+		"old_value": "{{changelog.summary.fromString}}",
+		"new_value": "{{changelog.summary.toString}}"
+	},{
+		"field_desc": "Fix Version",
+		"field_name": "fixVersions",
+		"field_type": "list",
+		"old_value": "{{changelog.fix Version.fromString}}",
+		"new_value": "{{issue.fixVersions.name}}"
+	},{
+		"field_desc": "Vertical Track",
+		"field_name": "customfield_24174",
+		"field_type": "list",
+		"old_value": "{{changelog.Vertical Track.fromString}}",
+		"new_value": "{{changelog.Vertical Track.toString}}"
+	},{
+		"field_desc": "labels",
+		"field_name": "labels",
+		"field_type": "list",
+		"old_value": "{{changelog.labels.fromString}}",
+		"new_value": "{{changelog.labels.toString}}"
+	},{
+		"field_desc": "Dev estimate",
+		"field_name": "customfield_25757",
+		"field_type": "text",
+		"old_value": "{{changelog.Dev estimate.fromString}}",
+		"new_value": "{{changelog.Dev estimate.toString}}"
+	},{
+		"field_desc": "QA estimate",
+		"field_name": "customfield_25958",
+		"field_type": "text",
+		"old_value": "{{changelog.QA estimate.fromString}}",
+		"new_value": "{{changelog.QA estimate.toString}}"
+	},{
+		"field_desc": "story points",
+		"field_name": "customfield_10422",
+		"field_type": "text",
+		"old_value": "{{changelog.story points.fromString}}",
+		"new_value": "{{changelog.story points.toString}}"
+	},{
+		"field_desc": "affects version",
+		"field_name": "versions",
+		"field_type": "list",
+		"old_value": "{{changelog.affects version.fromString}}",
+		"new_value": "{{changelog.affects version.toString}}"
+	},{
+		"field_desc": "sprint",
+		"field_name": "customfield_10652",
+		"field_type": "list",
+		"old_value": "{{changelog.sprint.fromString}}",
+		"new_value": "{{changelog.sprint.toString}}"
+	},{
+		"field_desc": "target start",
+		"field_name": "customfield_18350",
+		"field_type": "date",
+		"old_value": "{{changelog.target start.fromString}}",
+		"new_value": "{{changelog.target start.toString}}"
+	},{
+		"field_desc": "target end",
+		"field_name": "customfield_18351",
+		"field_type": "date",
+		"old_value": "{{changelog.target end.fromString}}",
+		"new_value": "{{changelog.target end.toString}}"
+	},{
+		"field_desc": "Local PM",
+		"field_name": "customfield_24893",
+		"field_type": "list",
+		"old_value": "{{changelog.Local PM.fromString}}",
+		"new_value": "{{changelog.Local PM.toString}}"
+	},{
+		"field_desc": "exsit on production",
+		"field_name": "customfield_10570",
+		"field_type": "list",
+		"old_value": "{{changelog.exsit on production.fromString}}",
+		"new_value": "{{changelog.exsit on production.toString}}"
+	},{
+		"field_desc": "affects customer",
+		"field_name": "customfield_13250",
+		"field_type": "list",
+		"old_value": "{{changelog.affects customer.fromString}}",
+		"new_value": "{{changelog.affects customer.toString}}"
+	},{
+		"field_desc": "DEA",
+		"field_name": "customfield_26055",
+		"field_type": "list",
+		"old_value": "{{changelog.dea.fromString}}",
+		"new_value": "{{changelog.dea.toString}}"
+	},{
+		"field_desc": "business value",
+		"field_name": "customfield_10423",
+		"field_type": "text",
+		"old_value": "{{changelog.business value.fromString}}",
+		"new_value": "{{changelog.business value.toString}}"
+	},{
+		"field_desc": "priority",
+		"field_name": "priority",
+		"field_type": "list",
+		"old_value": "{{changelog.priority.fromString}}",
+		"new_value": "{{changelog.priority.toString}}"
+	},{
+		"field_desc": "issuetype",
+		"field_name": "issuetype",
+		"field_type": "list",
+		"old_value": "{{changelog.issuetype.fromString}}",
+		"new_value": "{{changelog.issuetype.toString}}"
+	},{
+		"field_desc": "assignee",
+		"field_name": "assignee",
+		"field_type": "list",
+		"old_value": "{{changelog.assignee.fromString}}",
+		"new_value": "{{changelog.assignee.toString}}"
+	},{
+		"field_desc": "reporter",
+		"field_name": "reporter",
+		"field_type": "list",
+		"old_value": "{{changelog.reporter.fromString}}",
+		"new_value": "{{changelog.reporter.toString}}"
+	},{
+		"field_desc": "duedate",
+		"field_name": "duedate",
+		"field_type": "date",
+		"old_value": "{{changelog.duedate.fromString}}",
+		"new_value": "{{changelog.duedate.toString}}"
+	},{
+		"field_desc": "resolve date",
+		"field_name": "resolve date",
+		"field_type": "date",
+		"old_value": "{{changelog.resolve date.fromString}}",
+		"new_value": "{{changelog.resolve date.toString}}"
+	},{
+		"field_desc": "resolution",
+		"field_name": "resolution",
+		"field_type": "list",
+		"old_value": "{{changelog.resolution.fromString}}",
+		"new_value": "{{changelog.resolution.toString}}"
+	},{
+		"field_desc": "component",
+		"field_name": "component",
+		"field_type": "list",
+		"old_value": "{{changelog.component.fromString}}",
+		"new_value": "{{changelog.component.toString}}"
+	},{
+		"field_desc": "team",
+		"field_name": "customfield_17553",
+		"field_type": "list",
+		"old_value": "{{changelog.team.fromString}}",
+		"new_value": "{{changelog.team.toString}}"
+	},{
+		"field_desc": "epic link",
+		"field_name": "epic link",
+		"field_type": "text",
+		"old_value": "{{changelog.epic link.fromString}}",
+		"new_value": "{{changelog.epic link.toString}}"
+	},{
+		"field_desc": "product track",
+		"field_name": "product track",
+		"field_type": "list",
+		"old_value": "{{changelog.product track.fromString}}",
+		"new_value": "{{changelog.product track.toString}}"
+	}]
+}

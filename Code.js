@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-6-26 （版本更新勿替换Configurations区域）
+ * Version: 2024-8-15 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -870,6 +870,7 @@ function indexSyncback(dataSheet = null) {
       if (parseInt(c)+1 == primaryJiraKeyCol) continue
       tickets.push({
         jiraKey: dataValues[r][primaryJiraKeyCol-1],
+        keyHeader: primaryJiraFieldMap[primaryJiraKeyCol].desc,
         row: parseInt(r) + 1 + 1,
         column: parseInt(c) + 1,
         fieldName: primaryJiraField.name,
@@ -892,6 +893,7 @@ function indexSyncback(dataSheet = null) {
       if (parseInt(c)+1 == secondaryJiraKeyCol) continue
       tickets.push({
         jiraKey: dataValues[r][secondaryJiraKeyCol-1],
+        keyHeader: secondaryJiraFieldMap[secondaryJiraKeyCol].desc,
         row: parseInt(r) + 1 + 1,
         column: parseInt(c) + 1,
         fieldName: secondaryJiraField.name,
@@ -915,13 +917,13 @@ function _syncTicketsToSyncbackSheet(tickets = [], dataSheet) {
   if (!syncbackSheet) syncbackSheet = syncbackSS.insertSheet(syncbackSheetName)
 
   syncbackSheet.clear()
-  syncbackSheet.appendRow(["owner", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "list all value", "remove prefix", "remove suffix", "back format func", "last edit back time", "fail reason"]);
+  syncbackSheet.appendRow(["owner", "sheet key header", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "list all value", "remove prefix", "remove suffix", "back format func", "last edit back time", "fail reason"]);
   if (!tickets.length) { Logger.log('No data with config to sync!'); return }
 
   // tickets.forEach(ticket => {
   //   syncbackSheet.appendRow([userEmail, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId(), dataSheet.getName(), dataSheet.getSheetId(), ticket.row, ticket.column, ticket.isListAllValue, ticket.prefix, ticket.suffix, ticket.backFormatFunc]);
   // })
-  let rangeValues = tickets.map(ticket => [userEmail, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId(), dataSheet.getName(), dataSheet.getSheetId(), ticket.row, ticket.column, ticket.isListAllValue, ticket.prefix, ticket.suffix, ticket.backFormatFunc])
+  let rangeValues = tickets.map(ticket => [userEmail, ticket.keyHeader, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId(), dataSheet.getName(), dataSheet.getSheetId(), ticket.row, ticket.column, ticket.isListAllValue, ticket.prefix, ticket.suffix, ticket.backFormatFunc])
   syncbackSheet.getRange(2, 1, rangeValues.length, rangeValues[0].length).setValues(rangeValues)
   Logger.log('Sync syncback index successfully!\n' + syncbackSheetURL)
   return true

@@ -1,13 +1,12 @@
 {
-  "name": "jira-sync",
+  "name": "jira-sync-changelog",
   "version": "1.0.0",
   "description": "Bidirectional sync data between Google Sheet and JIRA",
   "main": "Code.js",
   "scripts": {
-    "init": "clasp clone 1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa",
+    "init": "clasp clone 12Xbw7JYblcBEimCJJYPpXaK7HqNRpnJvhRGvPyvZrQ7hXcKkJQXIFUGq",
     "pull": "clasp pull",
     "push": "clasp push",
-    "push-changelog": "clasp push -P changelog",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

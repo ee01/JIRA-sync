@@ -1,0 +1,5 @@
+# ignore even valid files
+.git/**
+node_modules/**
+changelog/**
+webhook/**
