@@ -3,7 +3,7 @@
  * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次
  * 
  * 
- * Version: 2024-8-15
+ * Version: 2024-8-21
  * 
  * Author: Esone
  *  */
@@ -39,13 +39,14 @@ function filterChangesNoRelatedToSheets() {
   })
   Logger.log(logs.length)
   logs = logs.forEach((log, i) => {
+    /* Deprecated: Keep sync.service in case to sync changes to other sheets
     if (log[colEditor-1] == 'sync.service@ringcentral.com') {
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Failed')
       jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
       jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
       jiraWebhookSheet.getRange(log['rowIndex'], colFailReason).setValue('Ignore sync.service to avoid running into loop!')
       return
-    }
+    } */
     locationInSheets = getLocationInSheets(log[colJIRAKey-1], log[colJIRAFieldName-1])
     if (!locationInSheets || locationInSheets.length <= 0) {
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Failed')
@@ -54,7 +55,18 @@ function filterChangesNoRelatedToSheets() {
       jiraWebhookSheet.getRange(log['rowIndex'], colFailReason).setValue('No mapping tickets in syncback index sheet!')
     } else {
       locationInSheets.forEach(location => {
-        changelogSheet.appendRow([log[colEditor-1], log[colFrom-1], "replace", log[colOldValue-1], log[colNewValue-1], location['sheet name'], location['sheet URL'], location['sheet tab'], location['sheet tab gid'], location['sheet row'], location['sheet column'], location['sheet key header'], log[colJIRAKey-1], location['JIRA field desc'], log[colJIRAFieldName-1], location['JIRA field type'], new Date()])
+        let newValue = log[colNewValue-1].replace(location['remove prefix'], '').replace(location['remove suffix'], '')
+        let backFormatFuc = function(value) {
+          if (!location['back format func']) return value
+          try{
+            return eval(location['back format func'].replaceAll('{value}', '"'+value+'"'))
+          }catch{
+            return value
+          }
+        }
+        newValue = backFormatFuc ? backFormatFuc(newValue) : newValue
+        if (newValue == log[colOldValue-1]) return
+        changelogSheet.appendRow([log[colEditor-1], log[colFrom-1], "replace", log[colOldValue-1], newValue, location['sheet name'], location['sheet URL'], location['sheet tab'], location['sheet tab gid'], location['sheet row'], location['sheet column'], location['sheet key header'], log[colJIRAKey-1], location['JIRA field desc'], log[colJIRAFieldName-1], location['JIRA field type'], new Date()])
       })
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Done')
       jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())

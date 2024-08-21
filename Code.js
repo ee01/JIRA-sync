@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-8-15 （版本更新勿替换Configurations区域）
+ * Version: 2024-8-21 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -27,7 +27,7 @@ const jiraFields = ['summary', 'priority', 'description', 'assignee', 'reporter'
 const installProperty = 'install-onEdit_recordChanges'
 const userEmail = Session.getActiveUser().getEmail()
 const userName =  userEmail.split('@')[0].replace('.', ' ')
-const countConfigColumns = 8
+const countConfigColumns = 9
 let primaryJiraKeyCol = 0
 let secondaryJiraKeyCol = null
 let primaryJiraFieldMap = null
@@ -100,7 +100,7 @@ function getFieldsConfig(dataSheet = null, headers = [], startCol = 1) {
     if (!new Set(headers).has('JIRA') && !new Set(headers).has('JIRA key')) return {}
     _createConfigSheet(configSheetName)
     Logger.log(configSheetName)
-    let configSheetNames = Properties.getProperty('did-create-config') || []
+    let configSheetNames = JSON.parse(Properties.getProperty('did-create-config')) || []
     configSheetNames.push(configSheetName)
     Properties.setProperty('did-create-config', configSheetNames);
     return {}
@@ -117,10 +117,20 @@ function getFieldsConfig(dataSheet = null, headers = [], startCol = 1) {
       isChangeAsAdding: !!x[4] && x[4] != 0 && x[4] != 'No',
       prefix: x[5],
       suffix: x[6],
+      format: x[7],
       formatFuc: function(value) {
         if (!x[7]) return value
         try{
           return eval(x[7].replaceAll('{value}', '"'+value+'"'))
+        }catch{
+          return value
+        }
+      },
+      backFormat: x[8],
+      backFormatFuc: function(value) {
+        if (!x[8]) return value
+        try{
+          return eval(x[8].replaceAll('{value}', '"'+value+'"'))
         }catch{
           return value
         }
@@ -142,21 +152,21 @@ function createConfigSheet() {
   if (configSheet) { ui.alert('Config sheet already exist!'); return }
   if (/.*_config$/.test(activeSheet.getName())) { ui.alert('You now stay on a config sheet!'); return }
   _createConfigSheet(configSheetName)
-  let configSheetNames = Properties.getProperty('did-create-config') || []
+  let configSheetNames = JSON.parse(Properties.getProperty('did-create-config')) || []
   configSheetNames.push(configSheetName)
   Properties.setProperty('did-create-config', configSheetNames);
 }
 function _createConfigSheet(configSheetName) {
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   configSheet = activeSpreadsheet.insertSheet(configSheetName)
-  configSheet.appendRow(["Sheet Column", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "", "Sheet Column - link ticket", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function"]);  // 如修改，请同步修改 countConfigColumns, fieldsConfigBySheetcolumn
+  configSheet.appendRow(["Sheet Column", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "Back format", "", "Sheet Column - link ticket", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "Back format"]);  // 如修改，请同步修改 countConfigColumns, fieldsConfigBySheetcolumn
   configSheet.getRange(1, 1, 1, 50).setFontWeight("bold")
-  configSheet.appendRow(["JIRA", "JIRA key", "", "", "", "", "", "", "", "UX Ticket", "link key"]);
+  configSheet.appendRow(["JIRA", "JIRA key", "", "", "", "", "", "", "", "", "UX Ticket", "link key"]);
   configSheet.appendRow(["Title", "summary", "2-ways", "text"]);
   configSheet.appendRow(["Type", "issuetype", "Back", "text"]);
   configSheet.appendRow(["Label", "labels", "To", "list", "Yes"]);
   configSheet.appendRow(["Component", "components", "2-ways", "list", "No"]);
-  configSheet.appendRow(["Release", "fixVersions", "2-ways", "list", "No", "", "", "{value}=='Video Wishlist'?{value}:'mThor '+{value}"]);
+  configSheet.appendRow(["Release", "fixVersions", "2-ways", "list", "No", "", "", "{value}=='Video Wishlist'?{value}:'mThor '+{value}", '{value}.split(",").map(re => re.replace(/[^\\d]*/, "").replace(/.*\\W(\\d+\\.\\d+\\.\\d+)/, "$1")).reduce((aggr, cur) => aggr>cur?aggr:cur, -Infinity)']);
   configSheet.appendRow(["Affect versions", "versions", "2-ways", "list", "No", "mThor "]);
   configSheet.appendRow(["Due date", "duedate", "2-ways", "date"]);
   configSheet.appendRow(["BV", "customfield_10423", "2-ways", "text"]);
@@ -879,7 +889,7 @@ function indexSyncback(dataSheet = null) {
         isListAllValue: primaryJiraField.isChangeAsAdding ? 'editing' : 'all',  // Todo: 'max'
         removePrefix: primaryJiraField.prefix,
         removeSuffix: primaryJiraField.suffix,
-        // backFormatFunc: primaryJiraField.formatFuc, // Todo
+        backFormat: primaryJiraField.backFormat,
       })
     }
   }
@@ -902,7 +912,7 @@ function indexSyncback(dataSheet = null) {
         isListAllValue: secondaryJiraField.isChangeAsAdding ? 'editing' : 'all',  // Todo: 'max'
         removePrefix: secondaryJiraField.prefix,
         removeSuffix: secondaryJiraField.suffix,
-        // backFormatFunc: secondaryJiraField.formatFuc, // Todo
+        backFormat: secondaryJiraField.backFormat,
       })
     }
   }
@@ -920,10 +930,15 @@ function _syncTicketsToSyncbackSheet(tickets = [], dataSheet) {
   syncbackSheet.appendRow(["owner", "sheet key header", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "list all value", "remove prefix", "remove suffix", "back format func", "last edit back time", "fail reason"]);
   if (!tickets.length) { Logger.log('No data with config to sync!'); return }
 
-  // tickets.forEach(ticket => {
-  //   syncbackSheet.appendRow([userEmail, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId(), dataSheet.getName(), dataSheet.getSheetId(), ticket.row, ticket.column, ticket.isListAllValue, ticket.prefix, ticket.suffix, ticket.backFormatFunc]);
-  // })
-  let rangeValues = tickets.map(ticket => [userEmail, ticket.keyHeader, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId(), dataSheet.getName(), dataSheet.getSheetId(), ticket.row, ticket.column, ticket.isListAllValue, ticket.prefix, ticket.suffix, ticket.backFormatFunc])
+  const spreadSheetName = activeSpreadsheet.getName()
+  const sheetURL = activeSpreadsheet.getUrl()+'#gid='+dataSheet.getSheetId()
+  const dataSheetName = dataSheet.getName()
+  const dataSheetId = dataSheet.getSheetId()
+  /* Deprecated: use setValues instead of appendRow
+  tickets.forEach(ticket => {
+    syncbackSheet.appendRow([userEmail, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, spreadSheetName, sheetURL, dataSheetName, dataSheetId, ticket.row, ticket.column, ticket.isListAllValue, ticket.removePrefix, ticket.removeSuffix, ticket.backFormat]);
+  }) */
+  let rangeValues = tickets.map(ticket => [userEmail, ticket.keyHeader, `=HYPERLINK("https://jira.ringcentral.com/browse/${ticket.jiraKey}", "${ticket.jiraKey}")`, ticket.fieldDesc, ticket.fieldName, ticket.fieldType, spreadSheetName, sheetURL, dataSheetName, dataSheetId, ticket.row, ticket.column, ticket.isListAllValue, ticket.removePrefix, ticket.removeSuffix, ticket.backFormat])
   syncbackSheet.getRange(2, 1, rangeValues.length, rangeValues[0].length).setValues(rangeValues)
   Logger.log('Sync syncback index successfully!\n' + syncbackSheetURL)
   return true
