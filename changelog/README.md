@@ -4,4 +4,6 @@
 
 2. Copy changelog/Code.js into the Appscript of the changelog sheet.
 
+3. Create a time-based trigger for filterChangesNoRelatedToSheets function by every minute.
 
+4. Create a time-based trigger for cleanData function by every hour.

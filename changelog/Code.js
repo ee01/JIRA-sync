@@ -9,11 +9,15 @@
  *  */
 
 const syncbackSheetURL = 'https://docs.google.com/spreadsheets/d/107ER5MfUeWfTZAKmvMvYwGTaHxI8zcaw3AnlEIAzKNk/edit#gid=0'
+const backupSheetURL = 'https://docs.google.com/spreadsheets/d/1qYptY_YHEw-Pr75UkH4dvm4g_Z0cwubxwXH2CzSus0Q/edit?gid=0#gid=0'
 
 const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
-const changelogSheet = activeSpreadsheet.getSheetByName('changelog')
+const changelogSheetName = 'changelog'
+const changelogSheet = activeSpreadsheet.getSheetByName(changelogSheetName)
 const colSheetURL = getHeaderCol('sheet URL', changelogSheet)
-const jiraWebhookSheet = activeSpreadsheet.getSheetByName('jira_webhook_data')
+const colIsSync_log = getHeaderCol('isSync', changelogSheet)
+const jiraWebhookSheetName = 'jira_webhook_data'
+const jiraWebhookSheet = activeSpreadsheet.getSheetByName(jiraWebhookSheetName)
 const colFrom = getHeaderCol('from', jiraWebhookSheet)
 const colEditor = getHeaderCol('Editor', jiraWebhookSheet)
 const colJIRAKey = getHeaderCol('JIRA key', jiraWebhookSheet)
@@ -28,7 +32,6 @@ const colFailReason = getHeaderCol('fail reason', jiraWebhookSheet)
 
 function filterChangesNoRelatedToSheets() {
   let logs = jiraWebhookSheet.getRange(2, 1, 10000, 21).getValues()
-  Logger.log(logs.length)
   logs = logs.filter((log, i) => {
     log['rowIndex'] = 2 + i
     if (!log[0]) return false
@@ -170,6 +173,42 @@ function deleteRow(sheet, rowIndex, validateCol, validateValue) {
   Logger.log('Row '+rowIndex+' has been deleted! Row data:')
   Logger.log(values[0])
   return true
+}
+
+
+/* Clean and backup old data */
+function cleanData() {
+  _cleanData(changelogSheetName, 1000, 500, ["editor", "from", "action", "old value", "new value", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "sheet key header", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "time", "isSync", "sync time", "took seconds", "fail reason"], colIsSync_log)
+  _cleanData(jiraWebhookSheetName, 2000, 1000, ["editor", "from", "action", "old value", "new value", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "time", "isSync", "sync time", "took seconds", "fail reason"], colIsSync)
+}
+function _cleanData(backupSheetName, overCapacity = 1000, cleanRows = 500, headers, isSyncColumn) {
+  // 检测备份条件
+  const cleanSheet = activeSpreadsheet.getSheetByName(backupSheetName)
+  let logs1000_1010 = cleanSheet.getRange(overCapacity, 1, 10, 21).getValues()
+  logs1000_1010 = logs1000_1010.filter(log => {
+    if (!log[0]) return false
+    if (!log[isSyncColumn-1]) return false
+    return true
+  })
+  if (logs1000_1010.length < 5) return
+
+  // 读取备份表
+  const backupSS = SpreadsheetApp.openByUrl(backupSheetURL)
+  let backupSheet = backupSS.getSheetByName(backupSheetName)
+  if (!backupSheet) {
+    backupSheet = backupSS.insertSheet(backupSheetName)
+    backupSheet.appendRow(headers);
+  }
+  let backupDataLength = backupSheet.getDataRange().getValues().length
+
+  // 备份
+  let logs500 = cleanSheet.getRange(2, 1, cleanRows, 21).getValues()
+  logs500 = logs500.filter(log => log[0])
+  backupSheet.getRange(backupDataLength+1, 1, logs500.length, 21).setValues(logs500)
+  Logger.log('Backup '+logs500.length+' rows in ['+backupSheetName+'] to '+backupSheetURL)
+
+  // 清除
+  cleanSheet.deleteRows(2, cleanRows)
 }
 
 
