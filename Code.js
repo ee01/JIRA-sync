@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-8-21 （版本更新勿替换Configurations区域）
+ * Version: 2024-8-22 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -17,6 +17,7 @@ try { // auto detech env
 Logger.log(env + ' environment')
 const logSheetURL = env == 'production' ? 'https://docs.google.com/spreadsheets/d/1tWJ9Mr8TdCPaXAawrRT1Opvza-UFvm4TMZ6RO_fyFcA/edit#gid=0' : 'https://docs.google.com/spreadsheets/d/1_V3PkFgh2lVRX2JB5H3oS1cl1FyoKH-mm0PHkcIdooc/edit#gid=937199117'
 const syncbackSheetURL = env == 'production' ? 'https://docs.google.com/spreadsheets/d/107ER5MfUeWfTZAKmvMvYwGTaHxI8zcaw3AnlEIAzKNk/edit#gid=0' : 'https://docs.google.com/spreadsheets/d/1Niy_BEmx57TAirrP5wH5CRiXYeflTDIImAUvaimCqY4/edit#gid=0'
+const editorEmail = 'jirasheetsyncer@jirasheetsyncer.iam.gserviceaccount.com'
 
 /* Configurations End */
 
@@ -235,6 +236,7 @@ function insertJIRAColumn() {
 function onHomepage(e) {
   Logger.log('installInfo:')
   Logger.log(installInfo)
+  const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   const ui = SpreadsheetApp.getUi()
   menu = menu || (env == 'production' ? ui.createAddonMenu() : ui.createMenu('JIRA sync test'))
   let myInstallTriggers = getMyInstallTriggers()
@@ -247,23 +249,47 @@ function onHomepage(e) {
   const card = CardService.newCardBuilder()
   const section = CardService.newCardSection()
   section.addWidget(CardService.newTextParagraph().setText("Welcome to JIRA sync!"))
-  // if (!isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Let\'s make it sync!').setWrapText(true)
-  //   .setButton(CardService.newTextButton().setText('Sync').setOnClickAction(CardService.newAction().setFunctionName("homepage_createSpreadsheetEditTrigger"))))
-  if (!isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Start sync from menu: Extensions -> JIRA sync -> Sync this sheet!\n\nThen refresh here.').setWrapText(true))
-  if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Create config sheet').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Create').setOnClickAction(CardService.newAction().setFunctionName("createConfigSheet"))))
-  if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('This sheet already synced. Start with adding a column named "JIRA" with issue id!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Insert').setOnClickAction(CardService.newAction().setFunctionName("insertJIRAColumn"))))
-  if (isInstalled) section.addWidget(CardService.newDecoratedText().setText('Fetch the latest data from JIRA!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Fetch').setOnClickAction(CardService.newAction().setFunctionName("getIssues"))))
-  if (isInstalled) section.addWidget(CardService.newDecoratedText().setText('Expand the sub issues to the Epic!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Expand').setOnClickAction(CardService.newAction().setFunctionName("expandSubIssues"))))
-  if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('If you change the config sheet, please refresh the catch for data sync back!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Refresh').setOnClickAction(CardService.newAction().setFunctionName("homepage_indexSyncback"))))
-  if (isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('You can pause sync for a while!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Pause').setOnClickAction(CardService.newAction().setFunctionName("comingSoon"))))
-  if (isInstalled && !isInstalledHourTrigger) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Re-do sync made you apply the new feature: Bidirectional-sync!').setWrapText(true)
-    .setButton(CardService.newTextButton().setText('Stop Sync').setOnClickAction(CardService.newAction().setFunctionName("homepage_removeSpreadsheetEditTrigger"))))
+  /* Deprecated: 用 homepage 安装会导致只有安装者有权限，其他用户无法触发 onEdit
+  if (!isInstalled) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Let\'s make it sync!').setWrapText(true)
+    .setButton(CardService.newTextButton().setText('Sync').setOnClickAction(CardService.newAction().setFunctionName("homepage_createSpreadsheetEditTrigger")))) */
+  if (!isInstalled) {
+    section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText()
+      .setText('Start sync from menu: Extensions -> JIRA sync -> Sync this sheet!\n\nThen refresh here.').setWrapText(true))
+  } else {
+    let editorEmails = activeSpreadsheet.getEditors().map(editor => editor.getEmail())
+    const canEdit = editorEmails.includes(editorEmail)
+    const didCreatedConfig = PropertiesService.getDocumentProperties().getProperty('did-create-config') || false
+    section.addWidget(CardService.newDivider())
+    section.addWidget(CardService.newTextParagraph().setText("Step 1."))
+    const buttonCreateConfig = CardService.newTextButton().setText('Create').setOnClickAction(CardService.newAction().setFunctionName("createConfigSheet"))
+    if (!didCreatedConfig) buttonCreateConfig.setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    section.addWidget(CardService.newDecoratedText().setText('Create config sheet').setWrapText(true)
+      .setButton(buttonCreateConfig))
+    const buttonRefreshIndex = CardService.newTextButton().setText('Refresh').setOnClickAction(CardService.newAction().setFunctionName("homepage_indexSyncback"))
+    if (canEdit) buttonRefreshIndex.setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+    if (didCreatedConfig) section.addWidget(CardService.newDecoratedText().setText('If you change the config sheet, please refresh the catch for data sync back!').setWrapText(true)
+      .setButton(buttonRefreshIndex))
+    section.addWidget(CardService.newDivider())
+    section.addWidget(CardService.newTextParagraph().setText("Step 2."))
+    const buttonGrant = CardService.newTextButton().setText('Grant').setOnClickAction(CardService.newAction().setFunctionName("grantAccessToEditAccount"))
+    section.addWidget(CardService.newDecoratedText().setText('Grant access for JIRA changes').setWrapText(true)
+      .setButton(!canEdit ? buttonGrant.setTextButtonStyle(CardService.TextButtonStyle.FILLED) : buttonGrant.setText('Granted').setDisabled(true)))
+    section.addWidget(CardService.newDivider())
+    section.addWidget(CardService.newTextParagraph().setText("Step 3."))
+    section.addWidget(CardService.newTextParagraph().setText("You've done the settings! Edit sheet data to sync."))
+    section.addWidget(CardService.newDivider())
+    section.addWidget(CardService.newTextParagraph().setText("Other tools"))
+    section.addWidget(CardService.newDecoratedText().setText('This sheet already synced. Start with adding a column named "JIRA" with issue id!').setWrapText(true)
+      .setButton(CardService.newTextButton().setText('Insert').setOnClickAction(CardService.newAction().setFunctionName("insertJIRAColumn"))))
+    section.addWidget(CardService.newDecoratedText().setText('Fetch the latest data from JIRA!').setWrapText(true)
+      .setButton(CardService.newTextButton().setText('Fetch').setOnClickAction(CardService.newAction().setFunctionName("getIssues"))))
+    section.addWidget(CardService.newDecoratedText().setText('Expand the sub issues to the Epic!').setWrapText(true)
+      .setButton(CardService.newTextButton().setText('Expand').setOnClickAction(CardService.newAction().setFunctionName("expandSubIssues"))))
+    section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('You can pause sync for a while!').setWrapText(true)
+      .setButton(CardService.newTextButton().setText('Pause').setOnClickAction(CardService.newAction().setFunctionName("comingSoon"))))
+    if (!isInstalledHourTrigger) section.addWidget(CardService.newDivider()).addWidget(CardService.newDecoratedText().setText('Re-do sync made you apply the new feature: Bidirectional-sync!').setWrapText(true)
+      .setButton(CardService.newTextButton().setText('Stop Sync').setOnClickAction(CardService.newAction().setFunctionName("homepage_removeSpreadsheetEditTrigger"))))
+  }
 
   let fixedButton = CardService.newTextButton()
   if (isInstalled) {
@@ -299,6 +325,14 @@ function alertInstallTips() {
 function comingSoon() {
   const ui = SpreadsheetApp.getUi()
   ui.alert(`Coming soon!`)
+}
+
+// Grant access
+function grantAccessToEditAccount() {
+  const ui = SpreadsheetApp.getUi()
+  const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+  activeSpreadsheet.addEditor(editorEmail)
+  ui.alert(`Granted! Now the JIRA changes can be synced back to this sheet!`)
 }
 
 
@@ -856,6 +890,7 @@ function onChange_indexSyncback(e) {
 function homepage_indexSyncback() {
   const ui = SpreadsheetApp.getUi()
   if (indexSyncback()) ui.alert('Refresh catch successfully!')
+    return CardService.newActionResponseBuilder()
 }
 function indexSyncback(dataSheet = null) {
   const ui = SpreadsheetApp.getUi()
