@@ -702,9 +702,9 @@ function fetchJIRADataFromLogSheet() {
 // 记录每次jira相关的修改推送到log表
 function recordChanges(e) {
   const activeSheet = SpreadsheetApp.getActiveSheet()
-  const range = e.range;
-  const column = range.getColumn();
-  const row = range.getRow();
+  const range = e.range
+  const column = range.getColumn()
+  const row = range.getRow()
   const isMultiple = !!(range.getNumRows() > 1 || range.getNumColumns() > 1)
   let firstValue = e.value || (e.oldValue?null:range.getValue()) // 粘帖和撤销异常值 - 
     // Copy:{e.value:null, e.oldValue:null, range.value:"test"} - range为准，可能多列
@@ -722,9 +722,9 @@ function recordChanges(e) {
     if (!isMultiple) {
       if (e.value === '') return;
       // if (!e.oldValue) return;
-      if (column == primaryJiraKeyCol) {Logger.log('No sync on changing JIRA key column!'); return}
-      if (!primaryJiraFieldMap[column]) {Logger.log('No JIRA mapping field change!'); return}
-      if (primaryJiraFieldMap[column].syncMode == 'Back' || primaryJiraFieldMap[column].syncMode == '2-ways') {Logger.log('No sync per to sync mode config!'); return}
+      if (column == primaryJiraKeyCol) {Logger.log('Skip as it is JIRA key column!'); return}
+      if (!primaryJiraFieldMap[column]) {Logger.log('Skip as change is no mapping to config JIRA fields!'); return}
+      if (primaryJiraFieldMap[column].syncMode == 'Back') {Logger.log('Skip per to sync mode config!'); return}
       const jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol).getValue();
       if (!jiraKey) {Logger.log('No specific JIRA key!'); return}
       
@@ -738,10 +738,10 @@ function recordChanges(e) {
         for (var c = column; c < column + range.getNumColumns(); c++) {
           let value = values[r-row][c-column]
           // Logger.log({value_range: value, r, c})
-          if (c == primaryJiraKeyCol) {Logger.log('Row:'+r+' Column:'+c + '. No sync on changing JIRA key column!'); continue}
-          if (!primaryJiraFieldMap[c]) {Logger.log('Row:'+r+' Column:'+c + '. No JIRA mapping field change!'); continue}
-          if (primaryJiraFieldMap[c].syncMode == 'Back' || primaryJiraFieldMap[c].syncMode == '2-ways') {Logger.log('Row:'+r+' Column:'+c + '. No sync per to sync mode config!'); continue}
-          if (!value) continue
+          if (c == primaryJiraKeyCol) {Logger.log('Row:'+r+' Column:'+c + '. Skip as it is JIRA key column!'); continue}
+          if (!primaryJiraFieldMap[c]) {Logger.log('Row:'+r+' Column:'+c + '. Skip as change is no mapping to config JIRA fields!'); continue}
+          if (primaryJiraFieldMap[c].syncMode == 'Back') {Logger.log('Row:'+r+' Column:'+c + '. Skip per to sync mode config!'); continue}
+          if (!value) {Logger.log('Row:'+r+' Column:'+c + '. Skip by no value, probably it is dragging row!'); continue}
           const jiraKey = range.getSheet().getRange(r, primaryJiraKeyCol).getValue();
           if (!jiraKey) {Logger.log('Row:'+r+' Column:'+c + '. No specific JIRA key!'); continue}
           
@@ -762,7 +762,7 @@ function recordChanges(e) {
       if (secondaryJiraKeyCol === null) return;
       if (column == secondaryJiraKeyCol) return;
       if (!secondaryJiraFieldMap[column]) return;
-      if (secondaryJiraFieldMap[column].syncMode == 'Back' || secondaryJiraFieldMap[column].syncMode == '2-ways') return;
+      if (secondaryJiraFieldMap[column].syncMode == 'Back') return;
       const jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol).getValue();
       if (!jiraKey) return;
       
@@ -777,7 +777,7 @@ function recordChanges(e) {
           let value = values[r-row][c-column]
           if (c == secondaryJiraKeyCol) continue
           if (!secondaryJiraFieldMap[c]) continue
-          if (secondaryJiraFieldMap[c].syncMode == 'Back' || secondaryJiraFieldMap[c].syncMode == '2-ways') continue
+          if (secondaryJiraFieldMap[c].syncMode == 'Back') continue
           if (!value) continue
           const jiraKey = range.getSheet().getRange(r, secondaryJiraKeyCol).getValue();
           if (!jiraKey) continue
@@ -791,7 +791,7 @@ function recordChanges(e) {
     }
   }()
 
-  function getData(id, idName, oldValue, newValue, JiraFieldMap = primaryJiraFieldMap, row = row, column = column) {
+  function getData(id, idName, oldValue, newValue, JiraFieldMap = primaryJiraFieldMap, row = range.getRow(), column = range.getColumn()) {
     // Format with custom function
     newValue = JiraFieldMap[column].formatFuc ? JiraFieldMap[column].formatFuc(newValue) : newValue
     // Format date
