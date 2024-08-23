@@ -165,5 +165,11 @@
 		"field_type": "list",
 		"old_value": "{{changelog.product track.fromString}}",
 		"new_value": "{{changelog.product track.toString}}"
+	},{
+		"field_desc": "status",
+		"field_name": "status",
+		"field_type": "list",
+		"old_value": "{{changelog.status.fromString}}",
+		"new_value": "{{changelog.status.toString}}"
 	}]
 }

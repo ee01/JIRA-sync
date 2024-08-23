@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-8-22 （版本更新勿替换Configurations区域）
+ * Version: 2024-8-23 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -628,6 +628,7 @@ function expandSubIssues() {
 
 function fetchJIRADataFromLogSheet() {
   // const dataSS = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
+  // Todo: 定时任务无法读取 activeSpreadsheet
   const dataSS = SpreadsheetApp.getActiveSpreadsheet()
   const logSS = SpreadsheetApp.openByUrl(logSheetURL)
   const dataSSId = dataSS.getId()
@@ -690,7 +691,7 @@ function recordChanges(e) {
   const range = e.range;
   const column = range.getColumn();
   const row = range.getRow();
-  const isMultiple = !!(range.getNumRows() || range.getNumColumns())
+  const isMultiple = !!(range.getNumRows() > 1 || range.getNumColumns() > 1)
   let firstValue = e.value || (e.oldValue?null:range.getValue()) // 粘帖和撤销异常值 - 
     // Copy:{e.value:null, e.oldValue:null, range.value:"test"} - range为准，可能多列
     // Delete:{e.value:null, e.oldValue:"test", range.value:null} - 可能多列
@@ -707,8 +708,9 @@ function recordChanges(e) {
     if (!isMultiple) {
       if (e.value === '') return;
       // if (!e.oldValue) return;
-      if (!primaryJiraFieldMap[column]) {Logger.log('No JIRA mapping field change!'); return}
       if (column == primaryJiraKeyCol) {Logger.log('No sync on changing JIRA key column!'); return}
+      if (!primaryJiraFieldMap[column]) {Logger.log('No JIRA mapping field change!'); return}
+      if (primaryJiraFieldMap[column].syncMode == 'Back' || primaryJiraFieldMap[column].syncMode == '2-ways') {Logger.log('No sync per to sync mode config!'); return}
       const jiraKey = range.getSheet().getRange(row, primaryJiraKeyCol).getValue();
       if (!jiraKey) {Logger.log('No specific JIRA key!'); return}
       
@@ -722,8 +724,9 @@ function recordChanges(e) {
         for (var c = column; c < column + range.getNumColumns(); c++) {
           let value = values[r-row][c-column]
           // Logger.log({value_range: value, r, c})
-          if (!primaryJiraFieldMap[c]) {Logger.log('Row:'+r+' Column:'+c + '. No JIRA mapping field change!'); continue}
           if (c == primaryJiraKeyCol) {Logger.log('Row:'+r+' Column:'+c + '. No sync on changing JIRA key column!'); continue}
+          if (!primaryJiraFieldMap[c]) {Logger.log('Row:'+r+' Column:'+c + '. No JIRA mapping field change!'); continue}
+          if (primaryJiraFieldMap[c].syncMode == 'Back' || primaryJiraFieldMap[c].syncMode == '2-ways') {Logger.log('Row:'+r+' Column:'+c + '. No sync per to sync mode config!'); continue}
           if (!value) continue
           const jiraKey = range.getSheet().getRange(r, primaryJiraKeyCol).getValue();
           if (!jiraKey) {Logger.log('Row:'+r+' Column:'+c + '. No specific JIRA key!'); continue}
@@ -743,8 +746,9 @@ function recordChanges(e) {
       if (e.value === '') return;
       // if (!e.oldValue) return;
       if (secondaryJiraKeyCol === null) return;
-      if (!secondaryJiraFieldMap[column]) return;
       if (column == secondaryJiraKeyCol) return;
+      if (!secondaryJiraFieldMap[column]) return;
+      if (secondaryJiraFieldMap[column].syncMode == 'Back' || secondaryJiraFieldMap[column].syncMode == '2-ways') return;
       const jiraKey = range.getSheet().getRange(row, secondaryJiraKeyCol).getValue();
       if (!jiraKey) return;
       
@@ -757,8 +761,9 @@ function recordChanges(e) {
       for (var r = row; r < row + range.getNumRows(); r++) {
         for (var c = column; c < column + range.getNumColumns(); c++) {
           let value = values[r-row][c-column]
-          if (!secondaryJiraFieldMap[c]) continue
           if (c == secondaryJiraKeyCol) continue
+          if (!secondaryJiraFieldMap[c]) continue
+          if (secondaryJiraFieldMap[c].syncMode == 'Back' || secondaryJiraFieldMap[c].syncMode == '2-ways') continue
           if (!value) continue
           const jiraKey = range.getSheet().getRange(r, secondaryJiraKeyCol).getValue();
           if (!jiraKey) continue
@@ -810,6 +815,7 @@ function _syncDataToLogSheet(data, from = "sheet", action = "") {
   logSheet.appendRow([userEmail, from, action||(data.isChangeAsAdding?'add':'replace'), data.oldValue, data.prefix+data.newValue+data.suffix, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+activeSheet.getSheetId(), activeSheet.getName(), activeSheet.getSheetId(), data.row, data.column, data.idName, `=HYPERLINK("https://jira.ringcentral.com/browse/${data.id}", "${data.id}")`, data.fieldDesc, data.field, data.type, new Date().toLocaleString()]);
   Logger.log('Sync log successfully!\n' + logSheetURL)
 }
+
 
 /* Reindex sync back index sheet */
 
@@ -905,7 +911,7 @@ function indexSyncback(dataSheet = null) {
   // Logger.log(primaryJiraFieldMap)
   let tickets = []
   // Primary JIRA columns index
-  let dataValues = dataSheet.getRange(2, 1, 500, primaryJiraFieldMap.length).getValues()
+  let dataValues = dataSheet.getRange(2, 1, 1000, primaryJiraFieldMap.length).getValues()
   for (var r in dataValues) {
     if (!dataValues[r][primaryJiraKeyCol-1]) continue
     // Logger.log(dataValues[r])
@@ -913,6 +919,7 @@ function indexSyncback(dataSheet = null) {
       const primaryJiraField = primaryJiraFieldMap[parseInt(c)+1]
       if (!primaryJiraField) continue
       if (parseInt(c)+1 == primaryJiraKeyCol) continue
+      if (primaryJiraField.syncMode != '2-ways' && primaryJiraField.syncMode != 'Back') continue
       tickets.push({
         jiraKey: dataValues[r][primaryJiraKeyCol-1],
         keyHeader: primaryJiraFieldMap[primaryJiraKeyCol].desc,
@@ -936,6 +943,7 @@ function indexSyncback(dataSheet = null) {
       const secondaryJiraField = secondaryJiraFieldMap[parseInt(c)+1]
       if (!secondaryJiraField) continue
       if (parseInt(c)+1 == secondaryJiraKeyCol) continue
+      if (secondaryJiraField.syncMode != '2-ways' && secondaryJiraField.syncMode != 'Back') continue
       tickets.push({
         jiraKey: dataValues[r][secondaryJiraKeyCol-1],
         keyHeader: secondaryJiraFieldMap[secondaryJiraKeyCol].desc,
