@@ -24,6 +24,7 @@ const editorEmail = 'jirasheetsyncer@jirasheetsyncer.iam.gserviceaccount.com'
 /* ------------------------- Replace following code to upgrade ------------------------------------------ */
 
 
+const logSheetName = 'changelog'
 const jiraFields = ['summary', 'priority', 'description', 'assignee', 'reporter', 'labels', 'components', 'issuetype', 'duedate', 'fixversions', 'status']  // Deprecated: Use config sheet to manage
 const installProperty = 'install-onEdit_recordChanges'
 const userEmail = Session.getActiveUser().getEmail()
@@ -627,9 +628,7 @@ function expandSubIssues() {
 }
 
 function fetchJIRADataFromLogSheet() {
-  // const dataSS = SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
-  // Todo: 定时任务无法读取 activeSpreadsheet
-  const dataSS = SpreadsheetApp.getActiveSpreadsheet()
+  const dataSS = env == 'production' ? SpreadsheetApp.getActiveSpreadsheet() : SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
   const logSS = SpreadsheetApp.openByUrl(logSheetURL)
   const dataSSId = dataSS.getId()
 
@@ -638,47 +637,62 @@ function fetchJIRADataFromLogSheet() {
     if (!/_config$/.test(sheet.getSheetName())) return
     const dataSheet = dataSS.getSheetByName(sheet.getSheetName().replace('_config', ''))
     if (!dataSheet) return
-    // const logSheetName = dataSS.getName() + ': ' + dataSheet.getName()
-    const logSheetName = 'changelog'
+    // logSheetName = dataSS.getName() + ': ' + dataSheet.getName()
     let logSheet = logSS.getSheetByName(logSheetName)
     if (!logSheet) {Logger.log(dataSheet.getName() + ': No log sheet found!'); return}
   
-    const sheetId = sheet.getSheetId()
     let logs = logSheet.getDataRange().getValues()
     let colSheetUrl = getHeaderCol('sheet URL', logSheet)
     let colSheetTabGid = getHeaderCol('sheet tab gid', logSheet)
+    let colTime = getHeaderCol('time', logSheet)
     let colStatus = getHeaderCol('isSync', logSheet)
+    let colSyncTime = getHeaderCol('sync time', logSheet)
+    let colTookSeconds = getHeaderCol('took seconds', logSheet)
     let colFrom = getHeaderCol('from', logSheet)
     let colAction = getHeaderCol('action', logSheet)
     let colNewValue = getHeaderCol('new value', logSheet)
+    let colOldValue = getHeaderCol('old value', logSheet)
     let colFieldDesc = getHeaderCol('JIRA field desc', logSheet)
     let colSheetRow = getHeaderCol('sheet row', logSheet)
     let colKeyHeader = getHeaderCol('sheet key header', logSheet)
     let colKey = getHeaderCol('JIRA key', logSheet)
-    logs.forEach(function(log, i) {
+    let logsFetched = logs.filter(function(log, i) {
       if (!RegExp(dataSSId).test(log[colSheetUrl-1])) return
-      if (log[colSheetTabGid-1] != sheetId) return
+      if (log[colSheetTabGid-1] != dataSheet.getSheetId()) return
       if (log[colStatus-1] == 'done') return
       if (log[colStatus-1] == 'failed') return
       if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'get') {
         if (!log[colNewValue-1]) return
-        let colDataSheetColumn = getHeaderCol(log[colFieldDesc-1], dataSheet)
+        return _copyDataFromChangelog()
+      } else if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'getSubissuesInsert') {
+        // Todo
+        if (!log[colNewValue-1]) return
+      } else if (log[colFrom-1] == 'jira') {
+        if (log[colNewValue-1] == log[colOldValue-1]) return false
+        return _copyDataFromChangelog()
+      }
+
+      function _copyDataFromChangelog() {
         let colDataSheetJIRA = getHeaderCol(log[colKeyHeader-1], dataSheet)
+        if (!colDataSheetJIRA) return false
+        let colDataSheetField = getHeaderCol(log[colFieldDesc-1], dataSheet)
+        if (!colDataSheetField) return false
         let dataRow = log[colSheetRow-1]
         if (dataSheet.getRange(dataRow, colDataSheetJIRA).getValue() != log[colKey-1]) {
           // dataSheet row/column 发生错位。检索 jira key 对应行进行修改
           dataRow = getRowByValue(log[colKey-1], log[colKeyHeader-1], dataSheet)
-          if (!dataRow) return
+          if (!dataRow) return false
         }
-        dataSheet.getRange(dataRow, colDataSheetColumn).setValue(log[colNewValue-1])
+        dataSheet.getRange(dataRow, colDataSheetField).setValue(log[colNewValue-1])
         logSheet.getRange(i+1, colStatus).setValue('done')
-        Logger.log({logSheetName, colDataSheetColumn, colSheetRow, newValue: log[colNewValue-1]})
-      } else if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'getSubissuesInsert') {
-        // Todo
-        if (!log[colNewValue-1]) return
+        logSheet.getRange(i+1, colSyncTime).setValue(new Date())
+        logSheet.getRange(i+1, colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
+        Logger.log({logSheetName, colDataSheetField, colSheetRow, newValue: log[colNewValue-1]})
+        return true
       }
     })
-    Logger.log('Fetch ' + dataSheet.getName() + ' data from log done!\n' + logSheetURL)
+    Logger.log('Fetch ' + dataSheet.getName() + ' data from log done!\nData sheet:' + dataSS.getUrl() + '\nData sheet owner:' + dataSS.getOwner().getEmail() + '\nLog sheet:' + logSheetURL)
+    Logger.log(logsFetched)
   })
 }
 
@@ -804,8 +818,7 @@ function _syncDataToLogSheet(data, from = "sheet", action = "") {
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   const activeSheet = SpreadsheetApp.getActiveSheet()
   const logSS = SpreadsheetApp.openByUrl(logSheetURL)
-  // const logSheetName = activeSpreadsheet.getName() + ': ' + activeSheet.getName()
-  const logSheetName = 'changelog'
+  // logSheetName = activeSpreadsheet.getName() + ': ' + activeSheet.getName()
   let logSheet = logSS.getSheetByName(logSheetName)
   if (!logSheet) {
     logSheet = logSS.insertSheet(logSheetName)
