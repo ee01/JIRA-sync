@@ -272,7 +272,7 @@ function onHomepage(e) {
       .setButton(buttonRefreshIndex))
     section.addWidget(CardService.newDivider())
     section.addWidget(CardService.newTextParagraph().setText("Step 2."))
-    const buttonGrant = CardService.newTextButton().setText('Grant').setOnClickAction(CardService.newAction().setFunctionName("grantAccessToEditAccount"))
+    const buttonGrant = CardService.newTextButton().setText('Grant').setOnClickAction(CardService.newAction().setFunctionName("homepage_grantAccessToEditAccount"))
     section.addWidget(CardService.newDecoratedText().setText('Grant access for JIRA changes').setWrapText(true)
       .setButton(!canEdit ? buttonGrant.setTextButtonStyle(CardService.TextButtonStyle.FILLED) : buttonGrant.setText('Granted').setDisabled(true)))
     section.addWidget(CardService.newDivider())
@@ -329,11 +329,12 @@ function comingSoon() {
 }
 
 // Grant access
-function grantAccessToEditAccount() {
+function homepage_grantAccessToEditAccount() {
   const ui = SpreadsheetApp.getUi()
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   activeSpreadsheet.addEditor(editorEmail)
   ui.alert(`Granted! Now the JIRA changes can be synced back to this sheet!`)
+  return CardService.newNavigation().updateCard(onHomepage())
 }
 
 
@@ -659,8 +660,8 @@ function fetchJIRADataFromLogSheet() {
     let logsFetched = logs.filter(function(log, i) {
       if (!RegExp(dataSSId).test(log[colSheetUrl-1])) return
       if (log[colSheetTabGid-1] != dataSheet.getSheetId()) return
-      if (log[colStatus-1] == 'Done') return
-      if (log[colStatus-1] == 'Failed') return
+      if (log[colStatus-1] == 'done') return
+      if (log[colStatus-1] == 'failed') return
       if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'get') {
         if (!log[colNewValue-1]) return
         return _copyDataFromChangelog()
@@ -684,7 +685,7 @@ function fetchJIRADataFromLogSheet() {
           if (!dataRow) return false
         }
         dataSheet.getRange(dataRow, colDataSheetField).setValue(log[colNewValue-1])
-        logSheet.getRange(i+1, colStatus).setValue('Done')
+        logSheet.getRange(i+1, colStatus).setValue('done')
         logSheet.getRange(i+1, colSyncTime).setValue(new Date())
         logSheet.getRange(i+1, colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
         Logger.log({logSheetName, colDataSheetField, colSheetRow, newValue: log[colNewValue-1]})
@@ -1035,4 +1036,25 @@ function getRowByValue(colValue, colName, sheet = SpreadsheetApp.getActiveSheet(
   let colValues = sheet.getRange(1, col, 100, 1).getValues()
   let rowByColValue = colValues.reduce((pre,cur,i) => {pre[cur[0]] = i+1; return pre}, {})
   return rowByColValue[colValue]
+}
+
+
+/**
+ * Web app API (TBD)
+ * 
+ * Configure: 
+ *  1. Deploy as web app, set access to "Anyone, even anonymous"
+ *  2. Set the URL+'?action=jiraChange' to JIRA webhook
+ * 
+ *  */
+function doGet(e) {
+  var name = e.parameter.name || "World";
+  return ContentService.createTextOutput(JSON.stringify({ message: "Hello, " + name + "!" }))
+                       .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  // 处理 POST 请求
+  var jsonData = JSON.parse(e.postData.contents);
+  return ContentService.createTextOutput("Received: " + jsonData);
 }
