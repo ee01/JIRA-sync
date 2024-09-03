@@ -143,16 +143,16 @@
 		"new_value": "{{changelog.resolution.toString}}"
 	},{
 		"field_desc": "component",
-		"field_name": "component",
+		"field_name": "components",
 		"field_type": "list",
-		"old_value": "{{changelog.component.fromString}}",
-		"new_value": "{{changelog.component.toString}}"
+		"old_value": "{{changelog.components.fromString}}",
+		"new_value": "{{changelog.components.toString}}"
 	},{
 		"field_desc": "team",
 		"field_name": "customfield_17553",
 		"field_type": "list",
-		"old_value": "{{changelog.team.fromString}}",
-		"new_value": "{{changelog.team.toString}}"
+		"old_value": "{{changelog.customfield_17553.fromString}}",
+		"new_value": "{{changelog.customfield_17553.toString}}"
 	},{
 		"field_desc": "epic link",
 		"field_name": "epic link",

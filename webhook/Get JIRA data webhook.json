@@ -1,0 +1,175 @@
+{
+	"editor": "{{webhookData.emailAddress}}",
+	"source": "jira",
+	"action": "get",
+	"jira_key": "{{issue.key}}",
+	"fields": [{
+		"field_desc": "summary",
+		"field_name": "summary",
+		"field_type": "text",
+		"old_value": "",
+		"new_value": "{{issue.summary}}"
+	},{
+		"field_desc": "Fix Version",
+		"field_name": "fixVersions",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.fixVersions.name}}"
+	},{
+		"field_desc": "Vertical Track",
+		"field_name": "customfield_24174",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.Vertical Track}}"
+	},{
+		"field_desc": "labels",
+		"field_name": "labels",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.labels}}"
+	},{
+		"field_desc": "Dev estimate",
+		"field_name": "customfield_25757",
+		"field_type": "text",
+		"old_value": "",
+		"new_value": "{{issue.Dev estimate}}"
+	},{
+		"field_desc": "QA estimate",
+		"field_name": "customfield_25958",
+		"field_type": "text",
+		"old_value": "",
+		"new_value": "{{issue.QA estimate}}"
+	},{
+		"field_desc": "story points",
+		"field_name": "customfield_10422",
+		"field_type": "text",
+		"old_value": "",
+		"new_value": "{{issue.story points}}"
+	},{
+		"field_desc": "affects version",
+		"field_name": "versions",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.affects version}}"
+	},{
+		"field_desc": "sprint",
+		"field_name": "customfield_10652",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.sprint}}"
+	},{
+		"field_desc": "target start",
+		"field_name": "customfield_18350",
+		"field_type": "date",
+		"old_value": "",
+		"new_value": "{{issue.target start}}"
+	},{
+		"field_desc": "target end",
+		"field_name": "customfield_18351",
+		"field_type": "date",
+		"old_value": "",
+		"new_value": "{{issue.target end}}"
+	},{
+		"field_desc": "Local PM",
+		"field_name": "customfield_24893",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.Local PM}}"
+	},{
+		"field_desc": "exsit on production",
+		"field_name": "customfield_10570",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.exsit on production}}"
+	},{
+		"field_desc": "affects customer",
+		"field_name": "customfield_13250",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.affects customer}}"
+	},{
+		"field_desc": "DEA",
+		"field_name": "customfield_26055",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.dea}}"
+	},{
+		"field_desc": "business value",
+		"field_name": "customfield_10423",
+		"field_type": "text",
+		"old_value": "",
+		"new_value": "{{issue.business value}}"
+	},{
+		"field_desc": "priority",
+		"field_name": "priority",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.priority}}"
+	},{
+		"field_desc": "issuetype",
+		"field_name": "issuetype",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.issuetype}}"
+	},{
+		"field_desc": "assignee",
+		"field_name": "assignee",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.assignee}}"
+	},{
+		"field_desc": "reporter",
+		"field_name": "reporter",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.reporter}}"
+	},{
+		"field_desc": "duedate",
+		"field_name": "duedate",
+		"field_type": "date",
+		"old_value": "",
+		"new_value": "{{issue.duedate}}"
+	},{
+		"field_desc": "resolve date",
+		"field_name": "resolve date",
+		"field_type": "date",
+		"old_value": "",
+		"new_value": "{{issue.resolve date}}"
+	},{
+		"field_desc": "resolution",
+		"field_name": "resolution",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.resolution.name}}"
+	},{
+		"field_desc": "component",
+		"field_name": "components",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.components.name}}"
+	},{
+		"field_desc": "team",
+		"field_name": "customfield_17553",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.customfield_17553}}"
+	},{
+		"field_desc": "epic link",
+		"field_name": "epic link",
+		"field_type": "text",
+		"old_value": "",
+		"new_value": "{{issue.epic link}}"
+	},{
+		"field_desc": "product track",
+		"field_name": "product track",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.product track}}"
+	},{
+		"field_desc": "status",
+		"field_name": "status",
+		"field_type": "list",
+		"old_value": "",
+		"new_value": "{{issue.status.name}}"
+	}]
+}

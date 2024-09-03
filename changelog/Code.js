@@ -3,7 +3,7 @@
  * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次
  * 
  * 
- * Version: 2024-8-21
+ * Version: 2024-8-30
  * 
  * Author: Esone
  *  */
@@ -19,6 +19,7 @@ const colIsSync_log = getHeaderCol('isSync', changelogSheet)
 const jiraWebhookSheetName = 'jira_webhook_data'
 const jiraWebhookSheet = activeSpreadsheet.getSheetByName(jiraWebhookSheetName)
 const colFrom = getHeaderCol('from', jiraWebhookSheet)
+const colAction = getHeaderCol('action', jiraWebhookSheet)
 const colEditor = getHeaderCol('Editor', jiraWebhookSheet)
 const colJIRAKey = getHeaderCol('JIRA key', jiraWebhookSheet)
 const colJIRAFieldName = getHeaderCol('JIRA field name', jiraWebhookSheet)
@@ -69,7 +70,7 @@ function filterChangesNoRelatedToSheets() {
         }
         newValue = backFormatFuc ? backFormatFuc(newValue) : newValue
         if (newValue == log[colOldValue-1]) return
-        changelogSheet.appendRow([log[colEditor-1], log[colFrom-1], "replace", log[colOldValue-1], newValue, location['sheet name'], location['sheet URL'], location['sheet tab'], location['sheet tab gid'], location['sheet row'], location['sheet column'], location['sheet key header'], `=HYPERLINK("https://jira.ringcentral.com/browse/${log[colJIRAKey-1]}", "${log[colJIRAKey-1]}")`, location['JIRA field desc'], log[colJIRAFieldName-1], location['JIRA field type'], new Date()])
+        changelogSheet.appendRow([log[colEditor-1], log[colFrom-1], log[colAction-1], log[colOldValue-1], newValue, location['sheet name'], location['sheet URL'], location['sheet tab'], location['sheet tab gid'], location['sheet row'], location['sheet column'], location['sheet key header'], `=HYPERLINK("https://jira.ringcentral.com/browse/${log[colJIRAKey-1]}", "${log[colJIRAKey-1]}")`, location['JIRA field desc'], log[colJIRAFieldName-1], location['JIRA field type'], new Date()])
       })
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Done')
       jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
