@@ -17,6 +17,7 @@ try { // auto detech env
 Logger.log(env + ' environment')
 const logSheetURL = env == 'production' ? 'https://docs.google.com/spreadsheets/d/1tWJ9Mr8TdCPaXAawrRT1Opvza-UFvm4TMZ6RO_fyFcA/edit#gid=0' : 'https://docs.google.com/spreadsheets/d/1_V3PkFgh2lVRX2JB5H3oS1cl1FyoKH-mm0PHkcIdooc/edit#gid=937199117'
 const syncbackSheetURL = env == 'production' ? 'https://docs.google.com/spreadsheets/d/107ER5MfUeWfTZAKmvMvYwGTaHxI8zcaw3AnlEIAzKNk/edit#gid=0' : 'https://docs.google.com/spreadsheets/d/1Niy_BEmx57TAirrP5wH5CRiXYeflTDIImAUvaimCqY4/edit#gid=0'
+const jiraGetDataWebhook = env == 'production' ? 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bf' : 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bfhttps://jira.ringcentral.com/rest/cb-automation/latest/hooks/5697bd573396a29a190ffe78e6eb88d74a5cf252'
 const editorEmail = 'jirasheetsyncer@jirasheetsyncer.iam.gserviceaccount.com'
 
 /* Configurations End */
@@ -569,6 +570,43 @@ function getIssues() {
   for (var row = range.getRow(); row < range.getRow() + range.getNumRows(); row++) {
     let primaryJiraValue = dataSheet.getRange(row, primaryJiraKeyCol).getValue()
     if (!primaryJiraValue) continue
+
+    try {
+      var response = UrlFetchApp.fetch(jiraGetDataWebhook, {
+        method: 'post',
+        contentType: 'application/json',
+        muteHttpExceptions: 'true', // 异步请求
+        payload: JSON.stringify({
+            "data": {
+                "emailAddress": userEmail
+            },
+            "issues": [ primaryJiraValue ]
+        })
+      });
+      var responseData = JSON.parse(response.getContentText());
+      
+      Logger.log("响应数据: " + JSON.stringify(responseData));
+      
+      CardService.newActionResponseBuilder()
+        .setNotification(
+          CardService.newNotification()
+            .setText("POST 请求成功，响应 ID: " + responseData.id)
+            .setType(CardService.NotificationType.INFO)
+        )
+        .build();
+    } catch (error) {
+      Logger.log("请求失败: " + error);
+      
+      CardService.newActionResponseBuilder()
+        .setNotification(
+          CardService.newNotification()
+            .setText("请求失败: " + error.message)
+            .setType(CardService.NotificationType.ERROR)
+        )
+        .build();
+    }
+
+    /* Deprecated: Need python script to fetch every column data
     for (var column in primaryJiraFieldMap) {
       if (column == primaryJiraKeyCol) continue
       if (!primaryJiraFieldMap[column]) continue
@@ -588,7 +626,7 @@ function getIssues() {
         suffix: '',
         time: new Date().getTime(),
       }, "sheet", "get")
-    }
+    } */
   }
   ui.alert("Please wait a min for data fetching!")
 }
@@ -722,6 +760,7 @@ function recordChanges(e) {
   !function(){
     if (!isMultiple) {
       if (e.value === '') return;
+      if (e.value === undefined) return;
       // if (!e.oldValue) return;
       if (column == primaryJiraKeyCol) {Logger.log('Skip as it is JIRA key column!'); return}
       if (!primaryJiraFieldMap[column]) {Logger.log('Skip as change is no mapping to config JIRA fields!'); return}
@@ -759,6 +798,7 @@ function recordChanges(e) {
   !function(){
     if (!isMultiple) {
       if (e.value === '') return;
+      if (e.value === undefined) return;
       // if (!e.oldValue) return;
       if (secondaryJiraKeyCol === null) return;
       if (column == secondaryJiraKeyCol) return;
@@ -826,7 +866,7 @@ function _syncDataToLogSheet(data, from = "sheet", action = "") {
     logSheet.appendRow(["editor", "from", "action", "old value", "new value", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "sheet column", "sheet key header", "JIRA key", "JIRA field desc", "JIRA field name", "JIRA field type", "time", "isSync", "sync time", "took seconds", "fail reason"]);
   }
 
-  logSheet.appendRow([userEmail, from, action||(data.isChangeAsAdding?'add':'replace'), data.oldValue, data.prefix+data.newValue+data.suffix, activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+activeSheet.getSheetId(), activeSheet.getName(), activeSheet.getSheetId(), data.row, data.column, data.idName, `=HYPERLINK("https://jira.ringcentral.com/browse/${data.id}", "${data.id}")`, data.fieldDesc, data.field, data.type, new Date().toLocaleString()]);
+  logSheet.appendRow([userEmail, from, action||(data.isChangeAsAdding?'add':'replace'), data.oldValue, data.newValue?data.prefix+data.newValue+data.suffix:'', activeSpreadsheet.getName(), activeSpreadsheet.getUrl()+'#gid='+activeSheet.getSheetId(), activeSheet.getName(), activeSheet.getSheetId(), data.row, data.column, data.idName, `=HYPERLINK("https://jira.ringcentral.com/browse/${data.id}", "${data.id}")`, data.fieldDesc, data.field, data.type, new Date().toLocaleString()]);
   Logger.log('Sync log successfully!\n' + logSheetURL)
 }
 
