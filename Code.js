@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-8-23 （版本更新勿替换Configurations区域）
+ * Version: 2024-9-5 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -165,7 +165,7 @@ function _createConfigSheet(configSheetName) {
   configSheet.appendRow(["Sheet Column", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "Back format", "", "Sheet Column - link ticket", "JIRA Field", "Sync mode", "Field type", "Change as adding?", "Prefix", "Suffix", "Format function", "Back format"]);  // 如修改，请同步修改 countConfigColumns, fieldsConfigBySheetcolumn
   configSheet.getRange(1, 1, 1, 50).setFontWeight("bold")
   configSheet.appendRow(["JIRA", "JIRA key", "", "", "", "", "", "", "", "", "UX Ticket", "link key"]);
-  configSheet.appendRow(["Title", "summary", "2-ways", "text"]);
+  configSheet.appendRow(["Title", "summary", "Back", "text"]);
   configSheet.appendRow(["Type", "issuetype", "Back", "text"]);
   configSheet.appendRow(["Label", "labels", "To", "list", "Yes"]);
   configSheet.appendRow(["Component", "components", "2-ways", "list", "No"]);
@@ -182,8 +182,8 @@ function _createConfigSheet(configSheetName) {
   configSheet.appendRow(["Assignee", "assignee", "2-ways", "list", "", "", "", "{value}.toLowerCase().replace(' ', '.')"]);
   configSheet.appendRow(["Reporter", "reporter", "2-ways", "list", "", "", "", "{value}.toLowerCase().replace(' ', '.')"]);
   configSheet.appendRow(["Local PM", "customfield_24893", "2-ways", "list", "", "", "", "{value}.toLowerCase().replace(' ', '.')"]);
-  configSheet.appendRow(["Dev manday", "customfield_25757", "2-ways", "text"]);
-  configSheet.appendRow(["QA manday", "customfield_25958", "2-ways", "text"]);
+  configSheet.appendRow(["Dev estimate", "customfield_25757", "2-ways", "text"]);
+  configSheet.appendRow(["QA estimate", "customfield_25958", "2-ways", "text"]);
   configSheet.appendRow(["Target start", "customfield_18350", "2-ways", "date"]);
   configSheet.appendRow(["Target end", "customfield_18351", "2-ways", "date"]);
   configSheet.appendRow(["Exist on Production", "customfield_10570", "2-ways", "text"]);
@@ -216,13 +216,17 @@ function markSyncHeaders(dataSheetName = null) {
   if (!dataSheet) return
   if (!configSheet) return
 
-  let columnValues = configSheet.getRange(2, 1, 100, 1).getValues()
-  let columnNames = columnValues.map(v => v[0])
+  let columnValues = configSheet.getRange(2, 1, 100, 3).getValues()
+  let columnNames_2ways = columnValues.filter(v => v[2]=='2-ways').map(v => v[0])
+  let columnNames_back = columnValues.filter(v => v[2]=='Back').map(v => v[0])
+  let columnNames_to = columnValues.filter(v => v[2]!='Back'&&v[2]!='2-ways').map(v => v[0])
   for (var col = 1; col <= 100; col++) {
     let headerCell = dataSheet.getRange(1, col)
     let headerValue = headerCell.getValue()
     if (!headerValue) continue
-    if (columnNames.includes(headerValue)) headerCell.setNote('This column is synced with JIRA')
+    if (columnNames_2ways.includes(headerValue)) headerCell.setNote('This column is synced with JIRA')
+    else if (columnNames_back.includes(headerValue)) headerCell.setNote('This column will get changes from JIRA')
+    else if (columnNames_to.includes(headerValue)) headerCell.setNote('This column is updating to JIRA')
     else headerCell.clearNote()
   }
 }
