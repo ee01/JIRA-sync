@@ -702,8 +702,8 @@ function fetchJIRADataFromLogSheet() {
     let logsFetched = logs.filter(function(log, i) {
       if (!RegExp(dataSSId).test(log[colSheetUrl-1])) return
       if (log[colSheetTabGid-1] != dataSheet.getSheetId()) return
-      if (log[colStatus-1] == 'done') return
-      if (log[colStatus-1] == 'failed') return
+      if (log[colStatus-1] == 'Done') return
+      if (log[colStatus-1] == 'Failed') return
       if (log[colFrom-1] == 'sheet' && log[colAction-1] == 'get') {
         if (!log[colNewValue-1]) return
         return _copyDataFromChangelog()
@@ -727,7 +727,7 @@ function fetchJIRADataFromLogSheet() {
           if (!dataRow) return false
         }
         dataSheet.getRange(dataRow, colDataSheetField).setValue(log[colNewValue-1])
-        logSheet.getRange(i+1, colStatus).setValue('done')
+        logSheet.getRange(i+1, colStatus).setValue('Done')
         logSheet.getRange(i+1, colSyncTime).setValue(new Date())
         logSheet.getRange(i+1, colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
         Logger.log({logSheetName, colDataSheetField, colSheetRow, newValue: log[colNewValue-1]})
