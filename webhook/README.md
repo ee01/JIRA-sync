@@ -33,8 +33,4 @@ This imcoming webhook will trigger the changes webhook above to sync data back t
 
 
 RC JIRA imcoming webhook mapping to JIRA project:
-- MTR: https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bf
-- FIJI: https://jira.ringcentral.com/rest/cb-automation/latest/hooks/12044d178a8091e40b447d27a20ec08efe3c7ef0
-- RCW: https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9d83331420ca8fa0a2f87438efe4f0ae04757653
-- EOINT: https://jira.ringcentral.com/rest/cb-automation/latest/hooks/13da6faff84caa9a2815e6c17daefd68d063a801
-- EW: https://jira.ringcentral.com/rest/cb-automation/latest/hooks/5721109a14fa4d21b3d4ca4354cbb229d1b965b5
+(moved into changelog/Code.js)

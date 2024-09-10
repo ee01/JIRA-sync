@@ -1,22 +1,29 @@
 /**
  * 定时轮询 JIRA webhook 的数据，清除无关联的，并生成有关联的到 changelog 等待执行数据推送
- * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次
+ * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次，同时添加 cleanData() 每小时执行一次
  * 
  * 
- * Version: 2024-8-30
+ * Version: 2024-9-10
  * 
  * Author: Esone
  *  */
 
 const syncbackSheetURL = 'https://docs.google.com/spreadsheets/d/107ER5MfUeWfTZAKmvMvYwGTaHxI8zcaw3AnlEIAzKNk/edit#gid=0'
 const backupSheetURL = 'https://docs.google.com/spreadsheets/d/1qYptY_YHEw-Pr75UkH4dvm4g_Z0cwubxwXH2CzSus0Q/edit?gid=0#gid=0'
-
-const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
 const changelogSheetName = 'changelog'
+const jiraWebhookSheetName = 'jira_webhook_data'
+const dataGettingSheetName = 'get_jira_data'
+const webhookByProject = {
+  MTR: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bf',
+  FIJI: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/12044d178a8091e40b447d27a20ec08efe3c7ef0',
+  RCW: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9d83331420ca8fa0a2f87438efe4f0ae04757653',
+  EOINT: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/13da6faff84caa9a2815e6c17daefd68d063a801',
+  EW: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/5721109a14fa4d21b3d4ca4354cbb229d1b965b5',
+}
+const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
 const changelogSheet = activeSpreadsheet.getSheetByName(changelogSheetName)
 const colSheetURL = getHeaderCol('sheet URL', changelogSheet)
 const colIsSync_log = getHeaderCol('isSync', changelogSheet)
-const jiraWebhookSheetName = 'jira_webhook_data'
 const jiraWebhookSheet = activeSpreadsheet.getSheetByName(jiraWebhookSheetName)
 const colFrom = getHeaderCol('from', jiraWebhookSheet)
 const colAction = getHeaderCol('action', jiraWebhookSheet)
@@ -245,4 +252,88 @@ function getRowByValues(whereArr, sheet = SpreadsheetApp.getActiveSheet()) {
       return true
     }, true)
   })
+}
+
+
+/**
+ * Web app API
+ * 
+ * Configure: 
+ *  1. Deploy as web app, set access to "Anyone, even anonymous"
+ *  2. Set the URL+'?action=jiraChange' to JIRA webhook
+ * 
+ *  */
+function doGet(e) {
+  switch (e.parameter.action) {
+    case 'getIssuesPendingData':
+      return ContentService.createTextOutput(JSON.stringify(getIssuesPendingData(e)))
+    default:
+      var name = e.parameter.name || "World";
+      return ContentService.createTextOutput(JSON.stringify({ message: "Hello, " + name + "!" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  switch (e.parameter.action) {
+    case 'sendJIRAIssues':
+      var jsonData = JSON.parse(e.postData.issues);
+      return ContentService.createTextOutput(populateJIRAIssues(jsonData))
+    case 'jiraChange':
+      // return jiraChange(e)
+    default:
+      return ContentService.createTextOutput('No action found!')
+      var jsonData = JSON.parse(e.postData.contents);
+      return ContentService.createTextOutput("Received: " + jsonData);
+  }
+}
+
+/* Deprecated: 移植到 Changelog script */
+function getIssuesPendingData() {
+  // const logSS = SpreadsheetApp.openByUrl(logSheetURL)
+  let logSheet = activeSpreadsheet.getSheetByName(dataGettingSheetName)
+  if (!logSheet) return {issues: []}
+
+  let logs = logSheet.getDataRange().getValues()
+  logs = logs.map((log,i) => ({
+    row: i+1,
+    editor: log[0],
+    key: log[1],
+    time: log[8],
+    isSync: log[9],
+  })).filter(log => !log.isSync)
+  if (!logs.length) return {issues: []}
+
+  let logsByProject = logs.reduce((aggr, cur) => {
+    const project = cur.key.split('-')[0].trim()
+    if (!aggr[project]) aggr[project] = []
+    if (project) aggr[project].push(cur)
+    return aggr
+  }, {})
+  let project1 = Object.keys(logsByProject)[0]
+  for (var project in logsByProject) {
+    if (!webhookByProject[project]) {
+      logsByProject[project].forEach(log => {
+        logSheet.getRange(log.row, 10, 1, 4).setValues([['Failed', new Date().toLocaleString(), Math.ceil((new Date().getTime() - new Date(log.time).getTime()) / 1000), "No webhook setup for this project!"]])
+      })
+      continue
+    }
+    project1 = project
+    logsByProject[project1].forEach(log => {
+      logSheet.getRange(log.row, 10, 1, 3).setValues([['Fetched', new Date().toLocaleString(), Math.ceil((new Date().getTime() - new Date(log.time).getTime()) / 1000)]])
+    })
+    break
+  }
+
+  return {
+    data: {
+      emailAddress: logsByProject[project1][0].editor,
+      webhook: webhookByProject[project1],
+    },
+    issues: logsByProject[project1].map(log => log.key)
+  }
+}
+
+function populateJIRAIssues(issues) {
+
 }

@@ -7,7 +7,7 @@
     "init": "clasp clone 1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa",
     "pull": "clasp pull",
     "push": "clasp push",
-    "push-changelog": "clasp push -P changelog",
+    "push-changelog": "cd changelog && clasp push",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

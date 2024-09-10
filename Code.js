@@ -686,8 +686,8 @@ function _syncGettingListToLogSheet(issues) {
   let logSheet = logSS.getSheetByName(dataGettingSheetName)
   if (!logSheet) {
     logSheet = logSS.insertSheet(dataGettingSheetName)
-    logSheet.appendRow(["editor", "JIRA key", "sheet key header", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "time", "isSync", "sync time", "took seconds"]);
-    // 有调整，同步修改 getIssuesPendingData
+    logSheet.appendRow(["editor", "JIRA key", "sheet key header", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "time", "isSync", "sync time", "took seconds", "fail reason"]);
+    // 有调整，同步修改 getIssuesPendingData (in changelog/Code.js)
   }
 
   issues.forEach(issue => {
@@ -1119,8 +1119,8 @@ function getRowByValue(colValue, colName, sheet = SpreadsheetApp.getActiveSheet(
  *  */
 function doGet(e) {
   switch (e.parameter.action) {
-    case 'getIssuesPendingData':
-      return ContentService.createTextOutput(JSON.stringify(getIssuesPendingData(e)))
+    // case 'getIssuesPendingData': // 移植到 Changelog script
+    //   return ContentService.createTextOutput(JSON.stringify(getIssuesPendingData(e)))
     default:
       var name = e.parameter.name || "World";
       return ContentService.createTextOutput(JSON.stringify({ message: "Hello, " + name + "!" }))
@@ -1139,30 +1139,6 @@ function doPost(e) {
       return ContentService.createTextOutput('No action found!')
       var jsonData = JSON.parse(e.postData.contents);
       return ContentService.createTextOutput("Received: " + jsonData);
-  }
-}
-
-function getIssuesPendingData() {
-  const logSS = SpreadsheetApp.openByUrl(logSheetURL)
-  let logSheet = logSS.getSheetByName(dataGettingSheetName)
-  if (!logSheet) return {issues: []}
-
-  let logs = logSheet.getDataRange().getValues()
-  logs = logs.map((log,i) => ({
-    row: i+1,
-    editor: log[0],
-    key: log[1],
-    time: log[8],
-    isSync: log[9],
-  })).filter(log => !log.isSync)
-  if (!logs.length) return {issues: []}
-
-  logs.forEach(log => {
-    logSheet.getRange(log.row, 10, 1, 3).setValues([['Fetched', new Date().toLocaleString(), Math.ceil((new Date().getTime() - new Date(log.time).getTime()) / 1000)]])
-  })
-  return {
-    data: {emailAddress: logs[0].editor},
-    issues: logs.map(log => log.key)
   }
 }
 
