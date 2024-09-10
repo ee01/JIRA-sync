@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-9-5 （版本更新勿替换Configurations区域）
+ * Version: 2024-9-10 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -26,6 +26,7 @@ const editorEmail = 'jirasheetsyncer@jirasheetsyncer.iam.gserviceaccount.com'
 
 
 const logSheetName = 'changelog'
+const dataGettingSheetName = 'get_jira_data'
 const jiraFields = ['summary', 'priority', 'description', 'assignee', 'reporter', 'labels', 'components', 'issuetype', 'duedate', 'fixversions', 'status']  // Deprecated: Use config sheet to manage
 const installProperty = 'install-onEdit_recordChanges'
 const userEmail = Session.getActiveUser().getEmail()
@@ -569,12 +570,15 @@ function getIssues() {
   initHeaders()
   if (!primaryJiraKeyCol) {ui.alert('Here is not data sheet, or config one mapping to "JIRA"!'); return}
 
-
+  let issueKeys = []
   let range = dataSheet.getActiveRange()
   for (var row = range.getRow(); row < range.getRow() + range.getNumRows(); row++) {
     let primaryJiraValue = dataSheet.getRange(row, primaryJiraKeyCol).getValue()
     if (!primaryJiraValue) continue
 
+    issueKeys.push({key: primaryJiraValue, keyHeader: primaryJiraFieldMap[primaryJiraKeyCol].name, row})
+
+    /* Deprecated: RC server is not available outside
     try {
       var response = UrlFetchApp.fetch(jiraGetDataWebhook, {
         method: 'post',
@@ -608,7 +612,7 @@ function getIssues() {
             .setType(CardService.NotificationType.ERROR)
         )
         .build();
-    }
+    } */
 
     /* Deprecated: Need python script to fetch every column data
     for (var column in primaryJiraFieldMap) {
@@ -632,6 +636,8 @@ function getIssues() {
       }, "sheet", "get")
     } */
   }
+
+  _syncGettingListToLogSheet(issueKeys)
   ui.alert("Please wait a min for data fetching!")
 }
 function expandSubIssues() {
@@ -668,6 +674,26 @@ function expandSubIssues() {
     }, "sheet", "getSubissuesInsert")
   }
   ui.alert("Empty row placeholder added. Please wait a min for data fetching!")
+}
+function _syncGettingListToLogSheet(issues) {
+  const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+  const activeSheet = SpreadsheetApp.getActiveSheet()
+  const activeSheetId = activeSheet.getSheetId()
+  const activeSheetName = activeSheet.getName()
+  const activeSheetUrl = activeSpreadsheet.getUrl() + '#gid=' + activeSheetId
+  const activeSpreadsheetName = activeSpreadsheet.getName()
+  const logSS = SpreadsheetApp.openByUrl(logSheetURL)
+  let logSheet = logSS.getSheetByName(dataGettingSheetName)
+  if (!logSheet) {
+    logSheet = logSS.insertSheet(dataGettingSheetName)
+    logSheet.appendRow(["editor", "JIRA key", "sheet key header", "sheet name", "sheet URL", "sheet tab", "sheet tab gid", "sheet row", "time", "isSync", "sync time", "took seconds"]);
+    // 有调整，同步修改 getIssuesPendingData
+  }
+
+  issues.forEach(issue => {
+    logSheet.appendRow([userEmail, `=HYPERLINK("https://jira.ringcentral.com/browse/${issue.key}", "${issue.key}")`, issue.keyHeader, activeSpreadsheetName, activeSheetUrl, activeSheetName, activeSheetId, issue.row, new Date().toLocaleString()]);
+  })
+  Logger.log('Sync log successfully!\n' + logSheetURL)
 }
 
 function fetchJIRADataFromLogSheet() {
@@ -1084,7 +1110,7 @@ function getRowByValue(colValue, colName, sheet = SpreadsheetApp.getActiveSheet(
 
 
 /**
- * Web app API (TBD)
+ * Web app API
  * 
  * Configure: 
  *  1. Deploy as web app, set access to "Anyone, even anonymous"
@@ -1092,13 +1118,54 @@ function getRowByValue(colValue, colName, sheet = SpreadsheetApp.getActiveSheet(
  * 
  *  */
 function doGet(e) {
-  var name = e.parameter.name || "World";
-  return ContentService.createTextOutput(JSON.stringify({ message: "Hello, " + name + "!" }))
-                       .setMimeType(ContentService.MimeType.JSON);
+  switch (e.parameter.action) {
+    case 'getIssuesPendingData':
+      return ContentService.createTextOutput(JSON.stringify(getIssuesPendingData(e)))
+    default:
+      var name = e.parameter.name || "World";
+      return ContentService.createTextOutput(JSON.stringify({ message: "Hello, " + name + "!" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doPost(e) {
-  // 处理 POST 请求
-  var jsonData = JSON.parse(e.postData.contents);
-  return ContentService.createTextOutput("Received: " + jsonData);
+  switch (e.parameter.action) {
+    case 'sendJIRAIssues':
+      var jsonData = JSON.parse(e.postData.issues);
+      return ContentService.createTextOutput(populateJIRAIssues(jsonData))
+    case 'jiraChange':
+      // return jiraChange(e)
+    default:
+      return ContentService.createTextOutput('No action found!')
+      var jsonData = JSON.parse(e.postData.contents);
+      return ContentService.createTextOutput("Received: " + jsonData);
+  }
+}
+
+function getIssuesPendingData() {
+  const logSS = SpreadsheetApp.openByUrl(logSheetURL)
+  let logSheet = logSS.getSheetByName(dataGettingSheetName)
+  if (!logSheet) return {issues: []}
+
+  let logs = logSheet.getDataRange().getValues()
+  logs = logs.map((log,i) => ({
+    row: i+1,
+    editor: log[0],
+    key: log[1],
+    time: log[8],
+    isSync: log[9],
+  })).filter(log => !log.isSync)
+  if (!logs.length) return {issues: []}
+
+  logs.forEach(log => {
+    logSheet.getRange(log.row, 10, 1, 3).setValues([['Fetched', new Date().toLocaleString(), Math.ceil((new Date().getTime() - new Date(log.time).getTime()) / 1000)]])
+  })
+  return {
+    data: {emailAddress: logs[0].editor},
+    issues: logs.map(log => log.key)
+  }
+}
+
+function populateJIRAIssues(issues) {
+
 }
