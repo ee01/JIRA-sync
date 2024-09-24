@@ -67,6 +67,9 @@ function filterChangesNoRelatedToSheets() {
       jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
       jiraWebhookSheet.getRange(log['rowIndex'], colFailReason).setValue('No mapping tickets in syncback index sheet!')
     } else {
+      jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Done')
+      jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
+      jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
       locationInSheets.forEach(location => {
         let newValue = log[colNewValue-1].replace(location['remove prefix'], '').replace(location['remove suffix'], '')
         let backFormatFuc = function(value) {
@@ -81,9 +84,6 @@ function filterChangesNoRelatedToSheets() {
         if (newValue == log[colOldValue-1]) return
         changelogSheet.appendRow([log[colEditor-1], log[colFrom-1], log[colAction-1], log[colOldValue-1], newValue, location['sheet name'], location['sheet URL'], location['sheet tab'], location['sheet tab gid'], location['sheet row'], location['sheet column'], location['sheet key header'], `=HYPERLINK("https://jira.ringcentral.com/browse/${log[colJIRAKey-1]}", "${log[colJIRAKey-1]}")`, location['JIRA field desc'], log[colJIRAFieldName-1], location['JIRA field type'], new Date()])
       })
-      jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Done')
-      jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
-      jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
       Logger.log('Append to changelog as found changed ticket in sheets. Sheet locations:')
       Logger.log(locationInSheets)
     }
