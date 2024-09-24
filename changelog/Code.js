@@ -3,7 +3,7 @@
  * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次，同时添加 cleanData() 每小时执行一次
  * 
  * 
- * Version: 2024-9-10
+ * Version: 2024-9-24
  * 
  * Author: Esone
  *  */
@@ -49,16 +49,18 @@ function filterChangesNoRelatedToSheets() {
     return true
   })
   Logger.log(logs.length)
-  logs = logs.forEach((log, i) => {
+  for (var i in logs) {
+    const log = logs[i]
     /* Deprecated: Keep sync.service in case to sync changes to other sheets
     if (log[colEditor-1] == 'sync.service@ringcentral.com') {
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Failed')
       jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
       jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
       jiraWebhookSheet.getRange(log['rowIndex'], colFailReason).setValue('Ignore sync.service to avoid running into loop!')
-      return
+      continue
     } */
     locationInSheets = getLocationInSheets(log[colJIRAKey-1], log[colJIRAFieldName-1])
+    if (jiraWebhookSheet.getRange(log['rowIndex'], colJIRAKey).getValue() != log[colJIRAKey-1]) break
     if (!locationInSheets || locationInSheets.length <= 0) {
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Failed')
       jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
@@ -85,7 +87,7 @@ function filterChangesNoRelatedToSheets() {
       Logger.log('Append to changelog as found changed ticket in sheets. Sheet locations:')
       Logger.log(locationInSheets)
     }
-  })
+  }
 }
 /* Deprecated: webhook in changelog sheet
 function filterChangesNoRelatedToSheets() {

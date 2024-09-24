@@ -4,7 +4,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-9-10 （版本更新勿替换Configurations区域）
+ * Version: 2024-9-13 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -19,6 +19,7 @@ const logSheetURL = env == 'production' ? 'https://docs.google.com/spreadsheets/
 const syncbackSheetURL = env == 'production' ? 'https://docs.google.com/spreadsheets/d/107ER5MfUeWfTZAKmvMvYwGTaHxI8zcaw3AnlEIAzKNk/edit#gid=0' : 'https://docs.google.com/spreadsheets/d/1Niy_BEmx57TAirrP5wH5CRiXYeflTDIImAUvaimCqY4/edit#gid=0'
 const jiraGetDataWebhook = env == 'production' ? 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bf' : 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bfhttps://jira.ringcentral.com/rest/cb-automation/latest/hooks/5697bd573396a29a190ffe78e6eb88d74a5cf252'
 const editorEmail = 'jirasheetsyncer@jirasheetsyncer.iam.gserviceaccount.com'
+const editorBackupEmail = 'sync.service@ringcentral.com'
 
 /* Configurations End */
 
@@ -339,6 +340,7 @@ function homepage_grantAccessToEditAccount() {
   const ui = SpreadsheetApp.getUi()
   const activeSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
   activeSpreadsheet.addEditor(editorEmail)
+  activeSpreadsheet.addEditor(editorBackupEmail)
   ui.alert(`Granted! Now the JIRA changes can be synced back to this sheet!`)
   return CardService.newNavigation().updateCard(onHomepage())
 }
