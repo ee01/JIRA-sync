@@ -3,7 +3,7 @@
  * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次，同时添加 cleanData() 每小时执行一次
  * 
  * 
- * Version: 2024-9-24
+ * Version: 2024-10-10
  * 
  * Author: Esone
  *  */
@@ -16,6 +16,7 @@ const dataGettingSheetName = 'get_jira_data'
 const webhookByProject = {
   MTR: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9edd6e55ec9b7da28206ab927562da913f5532bf',
   FIJI: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/12044d178a8091e40b447d27a20ec08efe3c7ef0',
+  RCV: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/43e945a82304f81f617e2c97d14032b4127348c0',
   RCW: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9d83331420ca8fa0a2f87438efe4f0ae04757653',
   EOINT: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/13da6faff84caa9a2815e6c17daefd68d063a801',
   EW: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/5721109a14fa4d21b3d4ca4354cbb229d1b965b5',
@@ -60,16 +61,20 @@ function filterChangesNoRelatedToSheets() {
       continue
     } */
     locationInSheets = getLocationInSheets(log[colJIRAKey-1], log[colJIRAFieldName-1])
-    if (jiraWebhookSheet.getRange(log['rowIndex'], colJIRAKey).getValue() != log[colJIRAKey-1]) break
+    const _isSync = jiraWebhookSheet.getRange(log['rowIndex'], colIsSync)
+    const _syncTime = jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime)
+    const _tookSeconds = jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds)
+    const _failReason = jiraWebhookSheet.getRange(log['rowIndex'], colFailReason)
+    if (jiraWebhookSheet.getRange(log['rowIndex'], colJIRAKey).getValue() != log[colJIRAKey-1]) break // 防止删除程序导致数据变动
     if (!locationInSheets || locationInSheets.length <= 0) {
-      jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Failed')
-      jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
-      jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
-      jiraWebhookSheet.getRange(log['rowIndex'], colFailReason).setValue('No mapping tickets in syncback index sheet!')
+      _isSync.setValue('Failed')
+      _syncTime.setValue(new Date())
+      _tookSeconds.setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
+      _failReason.setValue('No mapping tickets in syncback index sheet!')
     } else {
-      jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Done')
-      jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime).setValue(new Date())
-      jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds).setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
+      _isSync.setValue('Done')
+      _syncTime.setValue(new Date())
+      _tookSeconds.setValue(Math.ceil((new Date().getTime() - new Date(log[colTime-1]).getTime()) / 1000))
       locationInSheets.forEach(location => {
         let newValue = log[colNewValue-1].replace(location['remove prefix'], '').replace(location['remove suffix'], '')
         let backFormatFuc = function(value) {

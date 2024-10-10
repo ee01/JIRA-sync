@@ -1,6 +1,7 @@
 /**
  * 记录每次jira相关的修改推送到log表，之后可以用jenkins job去定时刷log表任务来update jira ticket
  * 创建配置表推送到syncback缓存表，当jira接收到修改webhook到时候，可以通过缓存表把jira变动推送回来
+ * Todo: rename 或者删除 config 的时候同步修改 syncback sheet
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
