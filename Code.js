@@ -2,10 +2,12 @@
  * 记录每次jira相关的修改推送到log表，之后可以用jenkins job去定时刷log表任务来update jira ticket
  * 创建配置表推送到syncback缓存表，当jira接收到修改webhook到时候，可以通过缓存表把jira变动推送回来
  * Todo: rename 或者删除 config 的时候同步修改 syncback sheet
+ * Todo: 每天定时刷新一次 syncback sheet
+ * Todo: 每天定时抓取jira最新数据，通过Jennifer新接口
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-9-13 （版本更新勿替换Configurations区域）
+ * Version: 2024-10-24 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -511,6 +513,7 @@ function _onChange(e) {
 function _runEveryHour() {
   fetchJIRADataFromLogSheet()
   runQueue()  // Run queue to sync syncback index data
+  daily_indexSyncback()
 }
 
 // Queue class
@@ -982,14 +985,33 @@ function onChange_indexSyncback(e) {
 
 function homepage_indexSyncback() {
   const ui = SpreadsheetApp.getUi()
-  if (indexSyncback()) ui.alert('Refresh catch successfully!')
-    return CardService.newActionResponseBuilder()
+  let result = indexSyncback()
+  if (result) ui.alert('Refresh catch successfully!')
+  else if (typeof result === 'string') ui.alert(result)
+  return CardService.newActionResponseBuilder()
 }
+
+function daily_indexSyncback() {
+  const Properties = PropertiesService.getDocumentProperties()
+  let lastRun = Properties.getProperty('lastRun_daily_indexSyncback')
+  Logger.log(lastRun)
+  if (lastRun && new Date(lastRun).getDate() == new Date().getDate()) return
+  Properties.setProperty('lastRun_daily_indexSyncback', new Date())
+  const dataSS = env == 'production' ? SpreadsheetApp.getActiveSpreadsheet() : SpreadsheetApp.openByUrl("https://docs.google.com/spreadsheets/d/1GNeBIM6Z6cnUz1qnlB9rztQJjv6BebCTZQ-6oEGNmbo/edit?gid=0#gid=0")
+
+  const dataSheets = dataSS.getSheets()
+  dataSheets.forEach(function(sheet) {
+    if (!/_config$/.test(sheet.getSheetName())) return
+    const dataSheet = dataSS.getSheetByName(sheet.getSheetName().replace('_config', ''))
+    if (!dataSheet) return
+    indexSyncback(dataSheet)
+  })
+}
+
 function indexSyncback(dataSheet = null) {
-  const ui = SpreadsheetApp.getUi()
   if (!dataSheet) {
     const activeSheet = SpreadsheetApp.getActiveSheet()
-    if (!/.*_config$/.test(activeSheet.getName())) {ui.alert('You are currently not in the config sheet!'); return}
+    if (!/.*_config$/.test(activeSheet.getName())) return 'You are currently not in the config sheet!'
     const dataSheetName = activeSheet.getName().replace(/_config$/, "")
     dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(dataSheetName)
   } else if (typeof dataSheet == 'string') dataSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(dataSheet)

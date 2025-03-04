@@ -1,15 +1,17 @@
 /**
  * 定时轮询 JIRA webhook 的数据，清除无关联的，并生成有关联的到 changelog 等待执行数据推送
  * Install: 添加 filterChangesNoRelatedToSheets() 每分钟执行一次，同时添加 cleanData() 每小时执行一次
+ * Todo: Backup sheet menu
  * 
  * 
- * Version: 2024-10-10
+ * Version: 2025-3-3
  * 
  * Author: Esone
  *  */
 
 const syncbackSheetURL = 'https://docs.google.com/spreadsheets/d/107ER5MfUeWfTZAKmvMvYwGTaHxI8zcaw3AnlEIAzKNk/edit#gid=0'
-const backupSheetURL = 'https://docs.google.com/spreadsheets/d/1qYptY_YHEw-Pr75UkH4dvm4g_Z0cwubxwXH2CzSus0Q/edit?gid=0#gid=0'
+// const backupSheetURL = 'https://docs.google.com/spreadsheets/d/1qYptY_YHEw-Pr75UkH4dvm4g_Z0cwubxwXH2CzSus0Q/edit?gid=0#gid=0'
+const backupSheetURL = 'https://docs.google.com/spreadsheets/d/1apMkrLD9JceYnCQDmW8ERt2I0ki1XTqfdRRpYwowCoU/edit?gid=0#gid=0'
 const changelogSheetName = 'changelog'
 const jiraWebhookSheetName = 'jira_webhook_data'
 const dataGettingSheetName = 'get_jira_data'
@@ -18,6 +20,8 @@ const webhookByProject = {
   FIJI: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/12044d178a8091e40b447d27a20ec08efe3c7ef0',
   RCV: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/43e945a82304f81f617e2c97d14032b4127348c0',
   RCW: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/9d83331420ca8fa0a2f87438efe4f0ae04757653',
+  RCVR: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/11b9cdfd5a4c59cf2e8284e997e5984ce5e0fcac',
+  RCVSDK: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/b50fb49561e5d75697d1f9020c7e83363222d108',
   EOINT: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/13da6faff84caa9a2815e6c17daefd68d063a801',
   EW: 'https://jira.ringcentral.com/rest/cb-automation/latest/hooks/5721109a14fa4d21b3d4ca4354cbb229d1b965b5',
 }
@@ -38,6 +42,8 @@ const colTime = getHeaderCol('time', jiraWebhookSheet)
 const colSyncTime = getHeaderCol('sync time', jiraWebhookSheet)
 const colTookSeconds = getHeaderCol('took seconds', jiraWebhookSheet)
 const colFailReason = getHeaderCol('fail reason', jiraWebhookSheet)
+const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const theMonthLabel = new Date().getFullYear() + "_" + monthNames[new Date().getMonth()];
 
 function filterChangesNoRelatedToSheets() {
   let logs = jiraWebhookSheet.getRange(2, 1, 10000, 21).getValues()
@@ -52,6 +58,8 @@ function filterChangesNoRelatedToSheets() {
   Logger.log(logs.length)
   for (var i in logs) {
     const log = logs[i]
+    let _isSync = jiraWebhookSheet.getRange(log['rowIndex'], colIsSync)
+    if (_isSync.getValue() == 'Done' || _isSync.getValue() == 'Failed') continue
     /* Deprecated: Keep sync.service in case to sync changes to other sheets
     if (log[colEditor-1] == 'sync.service@ringcentral.com') {
       jiraWebhookSheet.getRange(log['rowIndex'], colIsSync).setValue('Failed')
@@ -61,7 +69,7 @@ function filterChangesNoRelatedToSheets() {
       continue
     } */
     locationInSheets = getLocationInSheets(log[colJIRAKey-1], log[colJIRAFieldName-1])
-    const _isSync = jiraWebhookSheet.getRange(log['rowIndex'], colIsSync)
+    _isSync = jiraWebhookSheet.getRange(log['rowIndex'], colIsSync)
     const _syncTime = jiraWebhookSheet.getRange(log['rowIndex'], colSyncTime)
     const _tookSeconds = jiraWebhookSheet.getRange(log['rowIndex'], colTookSeconds)
     const _failReason = jiraWebhookSheet.getRange(log['rowIndex'], colFailReason)
@@ -209,9 +217,9 @@ function _cleanData(backupSheetName, overCapacity = 1000, cleanRows = 500, heade
 
   // 读取备份表
   const backupSS = SpreadsheetApp.openByUrl(backupSheetURL)
-  let backupSheet = backupSS.getSheetByName(backupSheetName)
+  let backupSheet = backupSS.getSheetByName(backupSheetName + '_' + theMonthLabel)
   if (!backupSheet) {
-    backupSheet = backupSS.insertSheet(backupSheetName)
+    backupSheet = backupSS.insertSheet(backupSheetName + '_' + theMonthLabel)
     backupSheet.appendRow(headers);
   }
   let backupDataLength = backupSheet.getDataRange().getValues().length
@@ -295,7 +303,7 @@ function doPost(e) {
   }
 }
 
-/* Deprecated: 移植到 Changelog script */
+// 获取某个 jira issue 的信息
 function getIssuesPendingData() {
   // const logSS = SpreadsheetApp.openByUrl(logSheetURL)
   let logSheet = activeSpreadsheet.getSheetByName(dataGettingSheetName)
@@ -333,11 +341,14 @@ function getIssuesPendingData() {
   }
 
   return {
-    data: {
-      emailAddress: logsByProject[project1][0].editor,
-      webhook: webhookByProject[project1],
-    },
-    issues: logsByProject[project1].map(log => log.key)
+    url: webhookByProject[project1],
+    methord: 'POST',
+    forward_data: {
+      data: {
+        emailAddress: logsByProject[project1][0].editor,
+      },
+      issues: logsByProject[project1].map(log => log.key)
+    }
   }
 }
 
