@@ -7,7 +7,7 @@
  * 
  * Install the test deployment with this script: https://script.google.com/u/0/home/projects/1Fozil1svOmiFilRgNIi0O3iTonXTVnCA4hZtJZuGmJErb2LnJnSi-8Oa/edit
  * 
- * Version: 2024-10-24 （版本更新勿替换Configurations区域）
+ * Version: 2025-7-7 （版本更新勿替换Configurations区域）
  * 
  * Author: Esone
  *  */
@@ -781,12 +781,6 @@ function recordChanges(e) {
   const column = range.getColumn()
   const row = range.getRow()
   const isMultiple = !!(range.getNumRows() > 1 || range.getNumColumns() > 1)
-  let firstValue = e.value || (e.oldValue?null:range.getValue()) // 粘帖和撤销异常值 - 
-    // Copy:{e.value:null, e.oldValue:null, range.value:"test"} - range为准，可能多列
-    // Delete:{e.value:null, e.oldValue:"test", range.value:null} - 可能多列
-    // Undo:{e.value:null, e.oldValue:null, range.value:"test"} - range为准，可能多列
-    // 快速Delete&Undo:{e.value:null, e.oldValue:"test", range.value:"test"} - range为准，可能多列
-    // 拖拽自动填充:{e.value:null, e.oldValue:null, range.value:"test"} - range为准，可能多列
   if (/.*_config$/.test(activeSheet.getName())) {Logger.log('Config sheet, no sync!'); return}
   if (row == 1) {Logger.log('Header change, no sync!'); return}
   initHeaders()
@@ -795,8 +789,13 @@ function recordChanges(e) {
   // 推送第一字段列表的变化给JIRA
   !function(){
     if (!isMultiple) {
-      if (e.value === '') return;
-      if (e.value === undefined) return;
+      let firstValue = e.value || (e.oldValue?null:range.getValue()) // 粘帖和撤销异常值 - 
+        // Copy:{e.value:null, e.oldValue:null, range.getValue():"test"} - range为准，可能多列
+        // Delete:{e.value:null, e.oldValue:"test", range.getValue():null} - 可能多列
+        // Undo:{e.value:null, e.oldValue:null, range.getValue():"test"} - range为准，可能多列
+        // 快速Delete&Undo:{e.value:null, e.oldValue:"test", range.getValue():"test"} - range为准，可能多列
+        // 拖拽自动填充:{e.value:null, e.oldValue:null, range.getValue():"test"} - range为准，可能多列
+      if (!firstValue) return;
       // if (!e.oldValue) return;
       if (column == primaryJiraKeyCol) {Logger.log('Skip as it is JIRA key column!'); return}
       if (!primaryJiraFieldMap[column]) {Logger.log('Skip as change is no mapping to config JIRA fields!'); return}
@@ -805,7 +804,7 @@ function recordChanges(e) {
       if (!jiraKey) {Logger.log('No specific JIRA key!'); return}
       
       const jiraKeyName = range.getSheet().getRange(1, primaryJiraKeyCol).getValue();
-      let data = getData(jiraKey, jiraKeyName, e.oldValue, e.value, primaryJiraFieldMap)
+      let data = getData(jiraKey, jiraKeyName, e.oldValue, firstValue, primaryJiraFieldMap)
       Logger.log(data)
       _syncDataToLogSheet(data)
     } else {
